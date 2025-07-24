@@ -1,0 +1,63 @@
+docker pull mongo 
+docker pull mongo-express
+docker  network create mongo-network          -- create network
+
+
+
+********************************************************************************************************************************
+
+
+
+docker run \
+-p 27017:27017 \
+-d \
+-e MONGO_INITDB_ROOT_USERNAME=admin \
+-e MONGO_INITDB_ROOT_PASSWORD=secret \
+--name mongodb \
+--net mongo-network \
+mongo
+
+
+| Part                                   | Meaning                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `docker run`                           | Run a new container.                                                                                                     |
+| `-p 27017:27017`                       | Map port 27017 of host to 27017 of container (MongoDB default port).<br>So you can access MongoDB via `localhost:27017`. |
+| `-d`                                   | Run container in detached mode (runs in background).                                                                     |
+| `-e MONGO_INITDB_ROOT_USERNAME=admin`  | Set environment variable inside container.<br>Mongo uses this to create root user. Username = `admin`.                   |
+| `-e MONGO_INITDB_ROOT_PASSWORD=secret` | Set environment variable: password = `secret`.                                                                           |
+| `--name mongodb`                       | Give this container a name `mongodb`. Easy to refer later.                                                               |
+| `--net mongo-network`                  | Connect this container to Docker network `mongo-network`. Useful when multiple containers need to talk to each other.    |
+| `mongo`                                | The Docker image to use (official MongoDB image from Docker Hub).                                                        |
+
+
+docker exec -it mongodb bash
+printenv                           -- to see env variables
+
+
+
+
+********************************************************************************************************************************
+
+
+docker run -d -p 8081:8081 \
+-e ME_CONFIG_MONGODB_ADMINUSERNAME=admin \
+-e ME_CONFIG_MONGODB_ADMINPASSWORD=secret \
+--net mongo-network \
+--name mongo-express \
+-e ME_CONFIG_MONGODB_SERVER=mongodb \
+mongo-express
+
+| Part                                        | Meaning                                                                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `docker run`                                | Run a new container.                                                                                                                 |
+| `-d`                                        | Run in detached mode (in background).                                                                                                |
+| `-p 8081:8081`                              | Map container's port `8081` to host's port `8081`.<br>Mongo Express UI will be accessible on `http://localhost:8081`.                |
+| `-e ME_CONFIG_MONGODB_ADMINUSERNAME=admin`  | Pass environment variable: MongoDB admin username is `admin`.                                                                        |
+| `-e ME_CONFIG_MONGODB_ADMINPASSWORD=secret` | Pass environment variable: MongoDB admin password is `secret`.                                                                       |
+| `--net mongo-network`                       | Attach container to existing Docker network `mongo-network`. Allows communication with MongoDB container (both inside same network). |
+| `--name mongo-express`                      | Name this container `mongo-express`.                                                                                                 |
+| `-e ME_CONFIG_MONGODB_SERVER=mongodb`       | Tell Mongo Express that MongoDB is running on container `mongodb` (container name of your MongoDB).                                  |
+| `mongo-express`                             | The image to use (official Mongo Express image).                                                                                     |
+
+In simple words:
+"Run Mongo Express web UI, connect it to the mongodb container (on same network), expose it on port 8081, and login using admin/secret."

@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# 🗂 Basic File & Directory Commands
+
+ls                  # List files in current folder
+cd foldername       # Change into a folder
+cd ..               # Go back one folder
+pwd                 # Show current working directory
+mkdir newfolder     # Make a new folder
+touch file.txt      # Create a new file
+rm file.txt         # Delete a file
+rm -r foldername    # Delete a folder and everything inside it
+
+# 🔍 Viewing Files
+
+cat file.txt        # Show file content
+vim file.txt        # Show file content and edit
+
+# 🔧 System Info
+
+whoami              # Show your username
+df -h               # Show disk space usage in human-readable format
+
+# 🌐 Network
+
+ping google.com     # Check internet connection
+ip a                # Show your IP address and network info
+curl ifconfig.me    # Get your public IP address
+
+# 🛠 Package Management (Ubuntu/Debian)
+# sudo stands for "superuser do" — it lets a normal user run commands as the root (admin) user.
+
+sudo apt update                         # Check for available updates
+sudo apt upgrade                        # Install updates for installed packages
+sudo apt install packagename            # Install a new package (example: sudo apt install curl)
+
+sudo cmd	                # Run just one command as root	Safer, limited privilege
+sudo su               	    # Switch to full root shell	Admin wants full root access

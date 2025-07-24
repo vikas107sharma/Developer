@@ -1,0 +1,17 @@
+Docker networks 
+
+✅ Why this works?
+Docker network lets containers talk to each other by container name.
+No need for IP addresses.
+Fully isolated from your host machine.
+👉 This is how microservices usually work inside Docker.
+
+
+docker network create my-network    - Create a virtual network my-network so Docker containers can talk to each other by name.
+e.g.
+docker network create mongo-network
+298e575f5cb3985010d4e9b2efdb49acced13db9a16f910496035c98d968d9ce
+
+
+docker network ls    - Show all the networks
+
