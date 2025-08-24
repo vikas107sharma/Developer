@@ -1,0 +1,160 @@
+CURDATE(): Only date
+NOW(): Datetime
+
+
+✅ Time INTERVAL:
+SELECT * FROM your_table
+WHERE collection_date >= CURDATE() - INTERVAL 15 DAY;
+
+If you're comparing full datetime (not just date):
+SELECT * FROM your_table
+WHERE collection_date >= NOW() - INTERVAL 15 DAY;
+
+
+✅ SELECT max from each invoice_no
+SELECT ci.*
+FROM collection_invoices ci
+JOIN () as latest ON ci.invoice_no = latest.invoice_no
+AND ci.collection_date = latest.latest_date;
+
+SELECT ci.*
+FROM collection_invoices ci
+JOIN (
+  SELECT invoice_no, MAX(collection_date) AS latest_date
+  FROM collection_invoices
+  WHERE invoice_no IN (
+    'E250004027',
+    'E250004025',
+    'E250004043',
+    'E250004032',
+    'E250004030'
+  )
+  GROUP BY invoice_no
+) latest
+ON ci.invoice_no = latest.invoice_no
+AND ci.collection_date = latest.latest_date;
+
+
+✅ SELECT with date 
+SELECT * FROM collection_invoices WHERE DATE(`createdAt`) = '2025-07-24';
+
+
+✅ Index 
+CREATE INDEX index_name ON table_name (column_name);
+
+CREATE UNIQUE INDEX unique_entries ON cheque_bounce_details (
+    cheque_number,
+    invoice_no,
+    store_id,
+    due_date,
+    bank_id
+);
+
+DROP INDEX unique_entries ON cheque_bounce_details;
+
+
+✅ TRIGGERS
+CREATE TRIGGER trigger_name
+BEFORE|AFTER INSERT|UPDATE|DELETE ON table_name
+FOR EACH ROW
+BEGIN
+    -- Your SQL logic here
+END;
+
+SHOW TRIGGERS LIKE 'collection_invoices';
+
+CREATE TRIGGER log_order_insert
+AFTER INSERT ON orders
+FOR EACH ROW
+BEGIN
+    INSERT INTO order_logs (order_id, action, log_time)
+    VALUES (NEW.id, 'INSERTED', NOW());
+END;
+
+
+
+✅ View
+
+SHOW FULL TABLES WHERE Table_type = 'VIEW';
+
+
+
+✅ Create table
+CREATE TABLE table_name (
+    column1 datatype [constraints],
+    column2 datatype [constraints],
+    ...
+);
+
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+Part	          Meaning
+id	            Column name (column1)
+INT	            Datatype
+AUTO_INCREMENT	Constraint: Auto-increases value
+PRIMARY KEY	    Constraint: Makes it unique + not null
+
+
+
+✅ Stored procedure
+
+1. Main Table: orders
+CREATE TABLE orders (
+    id INT PRIMARY KEY,
+    status VARCHAR(20),
+    order_date DATE
+);
+
+2. Archive Table: orders_archive
+CREATE TABLE orders_archive (
+    id INT PRIMARY KEY,
+    status VARCHAR(20),
+    order_date DATE,
+    archived_at DATETIME
+);
+
+3. Stored Procedure: archive_completed_orders
+DELIMITER //
+
+CREATE PROCEDURE archive_completed_orders()
+BEGIN
+    -- Insert completed + old orders into archive table
+    INSERT INTO orders_archive (id, status, order_date, archived_at)
+    SELECT id, status, order_date, NOW()
+    FROM orders
+    WHERE status = 'completed' AND order_date < CURDATE() - INTERVAL 30 DAY;
+
+    -- Delete those orders from the main table
+    DELETE FROM orders
+    WHERE status = 'completed' AND order_date < CURDATE() - INTERVAL 30 DAY;
+END //
+
+DELIMITER ;
+
+4. Call it manually or with an event:
+CALL archive_completed_orders();
+
+5. Or schedule it (e.g. every week):
+CREATE EVENT auto_archive_orders
+ON SCHEDULE EVERY 7 DAY
+DO
+CALL archive_completed_orders();
+
+
+✅ JSON_EXTRACT
+JSON_EXTRACT(json_document, path_expression)
+Path expressions use a special syntax to navigate JSON structures:
+$ represents the root of the JSON document
+. accesses object properties (e.g., $.name)
+[] accesses array elements (e.g., $.items[0])
+SELECT JSON_EXTRACT('{"name": "John", "age": 30}', '$.name');
+-- Returns: "John"
+
+SELECT JSON_EXTRACT(task_data, '$.id') AS order_id
+FROM bnpl_tasks
+WHERE error_log LIKE '%Quid Brand id not found in order data%'
