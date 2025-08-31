@@ -36,3 +36,6 @@ sudo apt install packagename            # Install a new package (example: sudo a
 
 sudo cmd	                # Run just one command as root	Safer, limited privilege
 sudo su               	    # Switch to full root shell	Admin wants full root access
+
+rm -f demo*.txt            # Remove files like demo
+rm -r folder_name          # Remove folder
