@@ -1,0 +1,186 @@
+1️⃣ Python – API Call & Parse
+
+Write a Python function that calls a public REST API (or mock), parses JSON, and returns only title fields from the response.
+
+2️⃣ Kafka – Partition Key
+
+Write a Python Kafka producer that sends messages to a topic using a partition key based on user_id. Verify partitions are used.
+
+3️⃣ Kafka – Dead Letter Simulation
+
+Consume from one Kafka topic, and if processing fails (simulate exception on odd IDs), produce the message to a dead_letter topic.
+
+4️⃣ AWS Lambda – Environment Variable
+
+Write a Lambda function that reads an environment variable TABLE_NAME and logs it with the incoming event.
+
+5️⃣ AWS Lambda – Transform & Return
+
+Write a Lambda function that takes a list of numbers in the event and returns their squares.
+
+6️⃣ Redis – Leaderboard
+
+Use Redis Sorted Sets to maintain a leaderboard for players (player → score). Insert 3 players and retrieve the top 2.
+
+7️⃣ Redis – Pub/Sub
+
+Write Python code to subscribe to a Redis channel and publish 3 messages to it. Subscriber prints them as they arrive.
+
+8️⃣ Celery – Countdown Task
+
+Write a Celery task that prints “Hello” after a 10-second countdown (use countdown parameter).
+
+9️⃣ Docker – Multi-Stage Build
+
+Write a multi-stage Dockerfile to build a small Python app and copy only necessary files into the final image.
+
+🔟 Combined – Cache with Expiry & Fallback
+
+Write Python code that tries to get a key from Redis. If it’s not there, call a function to generate the value, store it in Redis with TTL=30s, and return it.
+
+
+
+
+
+
+
+
+
+--------------------------------- ANSWER ---------------------------------
+
+
+1️⃣ Python – API Call & Parse
+import requests
+
+def get_titles():
+    resp = requests.get('https://jsonplaceholder.typicode.com/posts')
+    data = resp.json()
+    return [item['title'] for item in data]
+
+print(get_titles()[:5])  # first 5 titles
+
+2️⃣ Kafka – Partition Key
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+for user_id in [1,2,3,1,2,3]:
+    producer.send('user_topic', {"user_id": user_id}, key=str(user_id).encode())
+producer.flush()
+
+3️⃣ Kafka – Dead Letter Simulation
+from kafka import KafkaConsumer, KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+consumer = KafkaConsumer(
+    'main_topic',
+    bootstrap_servers='localhost:9092',
+    value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+    auto_offset_reset='earliest'
+)
+
+for msg in consumer:
+    data = msg.value
+    try:
+        if data['id'] % 2 == 1:
+            raise Exception("fail")
+        print("Processed:", data)
+    except:
+        producer.send('dead_letter', data)
+
+4️⃣ AWS Lambda – Environment Variable
+import os
+
+def lambda_handler(event, context):
+    table = os.environ.get('TABLE_NAME', 'default_table')
+    print("TABLE_NAME:", table)
+    print("Event:", event)
+    return {"table": table}
+
+5️⃣ AWS Lambda – Transform & Return
+def lambda_handler(event, context):
+    numbers = event.get('numbers', [])
+    return {"squares": [n**2 for n in numbers]}
+
+6️⃣ Redis – Leaderboard
+import redis
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+r.zadd('leaderboard', {'Alice': 50, 'Bob': 70, 'Charlie': 60})
+print(r.zrevrange('leaderboard', 0, 1, withscores=True))
+# Top 2 players
+
+7️⃣ Redis – Pub/Sub
+import redis, threading, time
+
+r = redis.Redis()
+
+def subscriber():
+    pubsub = r.pubsub()
+    pubsub.subscribe('news')
+    for msg in pubsub.listen():
+        if msg['type'] == 'message':
+            print("Got:", msg['data'].decode())
+
+threading.Thread(target=subscriber, daemon=True).start()
+
+time.sleep(1)
+for i in range(3):
+    r.publish('news', f"Message {i}")
+time.sleep(2)
+
+8️⃣ Celery – Countdown Task
+
+tasks.py
+
+from celery import Celery
+app = Celery('demo', broker='redis://localhost:6379/0')
+
+@app.task
+def hello():
+    print("Hello after 10s")
+
+# call with: hello.apply_async(countdown=10)
+
+9️⃣ Docker – Multi-Stage Build
+# Stage 1: build dependencies
+FROM python:3.11-slim as builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --prefix=/install -r requirements.txt
+
+# Stage 2: runtime
+FROM python:3.11-slim
+WORKDIR /app
+COPY --from=builder /install /usr/local
+COPY . /app
+CMD ["python", "app.py"]
+
+🔟 Cache with Expiry & Fallback
+import redis, time
+
+r = redis.Redis()
+
+def expensive_function():
+    time.sleep(1)
+    return "new_value"
+
+def get_value(key):
+    val = r.get(key)
+    if val:
+        return val.decode()
+    val = expensive_function()
+    r.set(key, val, ex=30)
+    return val
+
+print(get_value('mykey'))
+print(get_value('mykey'))  # fast second time

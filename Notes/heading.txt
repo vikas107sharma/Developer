@@ -1,0 +1,101 @@
+🟩 Kafka:
+
+1. Api has limit of 200 calls/min
+2. Partition, replication factor, broaker assignment (Can we have 3 partition, 3 replication factor and 2 broaker )
+3. If consumer fails and restart how do you set it to start messages procession (from begining, at failed message, time when consumer starts)
+
+
+🟩 General: 
+Unique column combination
+Remove last 30 days records from log table
+Report download
+Auto reload on prod
+
+🟩 Git
+– You accidentally committed a 50 MB secret file. Show a Git command sequence to remove it from the last commit and from the entire history (preserve rest of repo).
+– Two developers modified the same file differently. Demonstrate via Git commands how you’d rebase your branch on top of main and resolve the conflicts.
+
+🟩 REST API Design & Consumption
+Q6 – Design a REST endpoint /orders/{id}/refund with idempotency. Explain + show Python code to call it safely with retries and backoff.
+
+# refund_api.py
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+import uuid
+
+app = FastAPI()
+
+# simple in-memory store for demo; use persistent DB in prod
+processed = {}  # idempotency_key -> response
+
+class RefundRequest(BaseModel):
+    amount: float
+    reason: Optional[str]
+
+@app.post("/orders/{order_id}/refund")
+def refund(order_id: int, body: RefundRequest, idempotency_key: Optional[str] = Header(None)):
+    if not idempotency_key:
+        raise HTTPException(status_code=400, detail="Idempotency-Key header required")
+    if idempotency_key in processed:
+        # return the previous result (idempotent)
+        return processed[idempotency_key]
+
+    # perform refund logic (validate order, refund via payments, etc)
+    # simulate:
+    result = {"order_id": order_id, "status": "refunded", "refund_id": str(uuid.uuid4())}
+
+    # store result with the idempotency key
+    processed[idempotency_key] = result
+    return result
+
+
+🟩 Application Performance Optimization
+Q10 – You have a Flask app with slow database queries. Show how to implement caching with Redis (including invalidation logic).
+# app.py
+from flask import Flask, jsonify, request
+import redis, json
+from functools import wraps
+from time import time
+
+app = Flask(__name__)
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def cache(key_fn, ttl=60):
+    def decorator(f):
+        @wraps(f)
+        def inner(*args, **kwargs):
+            key = key_fn(*args, **kwargs)
+            cached = r.get(key)
+            if cached:
+                return jsonify(json.loads(cached))
+            result = f(*args, **kwargs)
+            r.set(key, json.dumps(result), ex=ttl)
+            return jsonify(result)
+        return inner
+    return decorator
+
+# Example: get user profile (slow DB)
+def user_cache_key(user_id):
+    return f"user:{user_id}:profile"
+
+@app.route("/user/<int:user_id>")
+@cache(lambda user_id: user_cache_key(user_id), ttl=120)
+def get_user(user_id):
+    # simulate slow DB query
+    import time; time.sleep(1)
+    user = {"id": user_id, "name": f"User{user_id}"}
+    return user
+
+@app.route("/user/<int:user_id>", methods=["POST"])
+def update_user(user_id):
+    data = request.json or {}
+    # perform DB update here...
+    # invalidate cache for this user
+    r.delete(user_cache_key(user_id))
+    return jsonify({"status": "updated"})
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
