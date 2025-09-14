@@ -32,10 +32,6 @@ nums = [10, 20, 30]
 print(len(nums))  # 3
 
 
-x = "hello"
-print(dir(x))  # Shows all string methods and attributes
-
-
 text = "hello\nworld"
 print(str(text))   # hello
                    # world
@@ -52,7 +48,7 @@ print(nums)
 
 
 
-# enumerate(iterable) – Get index and value while looping
+# Looping on list: enumerate(iterable) – Get index and value while looping
 fruits = ['apple', 'banana', 'cherry']
 for index, fruit in enumerate(fruits):
     print(index, fruit, fruits[index])
@@ -69,7 +65,7 @@ for name, score in zip(names, scores):
     print(name, score)
 
 
-
+# Looping on objects
 d = {'a': 1, 'b': 2, 'c': 3}
 for key, val in d.items():
     print(key, val)
@@ -78,8 +74,6 @@ for key, val in d.items():
 
 values = [0, False, 5]
 print(any(values))  # True (because 5 is truthy)
-
-
 
 flags = [True, 1, "yes"]
 print(all(flags))  # True
@@ -158,7 +152,6 @@ d.clear()               # Remove all items
 s = "hello world"
 s.upper()               # 'HELLO WORLD'
 s.lower()               # 'hello world'
-s.title()               # 'Hello World'
 s.strip()               # Remove surrounding whitespace
 s.replace("world", "Python")  # Replace substring
 s.find("lo")            # Index of first occurrence
@@ -166,3 +159,4 @@ s.split()               # ['hello', 'world']
 s.join(['a', 'b'])      # 'a b'
 s.startswith("he")      # True
 s.endswith("ld")        # True
+
