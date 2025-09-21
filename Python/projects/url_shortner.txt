@@ -24,7 +24,7 @@ Preview Page – optional page that shows the destination before redirecting.
 
 Spam & Phishing Detection (check destination URL against safe-browsing APIs).
 
-Rate Limiting to prevent abuse.
+Rate Limiting to prevent abuse. (10 api per/minute/user for free version)
 
 Authentication (login system so users can manage their links).
 
