@@ -1,6 +1,6 @@
 🟩 Kafka:
 
-1. Api has limit of 200 calls/min
+1. Api has limit of 20 calls/min/user
 2. Partition, replication factor, broaker assignment (Can we have 3 partition, 3 replication factor and 2 broaker )
 3. If consumer fails and restart how do you set it to start messages procession (from begining, at failed message, time when consumer starts)
 
@@ -8,8 +8,15 @@
 🟩 General: 
 Unique column combination
 Remove last 30 days records from log table
-Report download
-Auto reload on prod
+
+
+Why we do no keep auto reload on prod.
+
+Performance overhead – Auto-reload constantly watches files for changes, which consumes CPU/memory.
+Unnecessary restarts – In production, code shouldn’t change frequently; reloaders cause downtime or instability.
+Security risk – Debug modes and reloaders often expose extra info (tracebacks, internal state).
+Predictability – Production should run fixed, tested builds; reloaders can lead to inconsistent states.
+Scalability issues – In multi-instance setups (containers, Kubernetes), reloaders don’t sync well and can break load balancing.
 
 🟩 Git
 – You accidentally committed a 50 MB secret file. Show a Git command sequence to remove it from the last commit and from the entire history (preserve rest of repo).

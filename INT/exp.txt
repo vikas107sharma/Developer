@@ -1,16 +1,56 @@
 
-1. Database Schema Design for Large-Scale Optional Attributes
-Scenario: You have a massive Employee table (100 million records) with columns: id, name, salary, department_id.
+############################################  EVENT DRIVEN ARCHITECTURE  ############################################
 
-New Requirement: You need to store an optional foreign_identity_id for a subset of employees (~50,000, or 0.05% of the total).
+[QUESTION 1]
+Suppose multiple events are produced for the same order (OrderPlaced, OrderShipped, OrderDelivered). Consumers must process them in order. How would you ensure ordering in a distributed event-driven system? What trade-offs exist between ordering guarantees and scalability?
 
-Challenge: How do you alter the database schema to implement this new attribute efficiently in terms of storage, write performance, and read performance, without negatively impacting the existing 99.95% of records?
 
-What are the different schema design options (e.g., adding a nullable column, using a separate table)?
+[ANSWER]
 
-What are the trade-offs of each approach (storage overhead, index performance, query complexity)?
+Ensuring Ordering
 
-Which solution would you recommend and why?
+Partitioning by Key: Use a message broker/streaming platform (Kafka, Kinesis, Pulsar) and partition events by an identifier like order_id. All events for the same order go to the same partition → consumers process them in order.
+
+Single Consumer per Partition: Ensure only one consumer reads a partition at a time (or uses consumer groups with one consumer per partition) to preserve order.
+
+Idempotent Consumers: Even with ordering, make consumers idempotent so retries or replays don’t break consistency.
+
+Sequencing Info: Include sequence numbers or timestamps in events for verification.
+
+
+[QUESTION 2]
+
+Report download
+If generating a report takes ~15 minutes, a normal request/response API would timeout and the user would likely reload the page. How would you design the report download flow so it runs asynchronously (background job, status tracking, notification) and still gives the user a good experience?
+
+
+#############################################  API LIMIT  ##########################################################
+
+
+When a user updates their profile, we currently call an external API to send an email notification. In production, thousands of users may update their profiles at the same time, but the external API can handle only 200 requests per minute. How would you design this system to handle high traffic without breaching the API limit?
+
+
+#############################################  SQL  ##########################################################
+
+[QUESTION 1]
+emails = [...]
+for e of emails:
+  update(pincode) where email = e
+This causes one DB update per email. How would you optimize this to handle thousands of emails efficiently?
+
+[QUESTION 2]
+We have a log table that keeps growing rapidly. How would you design a solution to automatically remove records older than 30 days to prevent the database from growing too large?
+
+
+
+#############################################  DESIGN  ##########################################################
+
+[QUESTION 1]
+Design a nested comment sections where user can to a comment.
+
+
+
+#############################################  END  ##########################################################
 
 2. Caching Strategy for Frequently Updated, Expensive Aggregations
 Scenario: A UI must display the "Top 10 Most Searched Products," refreshed hourly. The data comes from a backend API that runs a complex, heavy SQL query with multiple joins to calculate these rankings on-the-fly.
@@ -24,70 +64,6 @@ What caching mechanism would you use (e.g., in-memory cache like Redis, database
 How would you handle the cache invalidation and refresh every hour?
 
 How does this design decouple the expensive processing from the user-facing request?
-
-3. Dynamic Content Management with Predictable Updates
-Scenario: A specific text element on a UI needs to be updated daily. The new content for each day is known in advance.
-
-Challenge: How do you manage this text without requiring a full code deployment or database change every single day?
-
-Where would you store the text and its schedule (e.g., a feature flag service, a simple database table, a JSON file in cloud storage)?
-
-How would you structure the system to allow non-developers (e.g., content managers) to easily update the text for future dates?
-
-How does the frontend or backend retrieve the correct text for the current day?
-
-What is the simplest, most maintainable solution for this requirement?
-
-
-4. Docker & Microservices (Dependency Management)
-Scenario: You are building a new microservice, Service A, which depends on a specific version of a shared common library (e.g., common-utils v2.1). This library is updated frequently by other teams. Service A has been running stably in production for months.
-
-Challenge: The team responsible for Service B pushes a new, breaking change to the shared library (common-utils v3.0) and updates their service. During the next deployment of your service, the CI/CD pipeline builds a new Docker image, fetches the latest version of the library, and your service breaks in production.
-
-How should you structure your Dockerfile (specifically concerning dependency installation) to prevent this?
-
-What is the precise command you should use in the Dockerfile to ensure reproducible builds for Python (pip) or Node.js (npm) projects?
-
-Beyond the Dockerfile, what development practices and CI/CD checks should be enforced to manage shared dependencies safely?
-
-5. Kafka (Designing for Durability and Order)
-Scenario: You are designing a payment processing system. The system must never lose a payment message and must process payment events for a single customer in the exact order they were received to avoid issues like double-charging.
-
-Challenge: How do you configure your Kafka producers, topics, and consumers to guarantee message durability (no data loss) and per-key ordering?
-
-What producer configuration (e.g., acks, retries) is necessary to ensure messages are not lost?
-
-How does the concept of a key (e.g., the customer_id) and the number of partitions relate to maintaining order?
-
-What is a critical consumer configuration to ensure you don't accidentally skip messages when your consumer crashes?
-
-Why is having only one consumer per consumer group per partition crucial for this requirement?
-
-6. API Design (Versioning and Backward Compatibility)
-Scenario: Your public REST API for GET /api/v1/users/{id} returns a user object. You need to add a new field, last_login_date, to the response. Later, you realize you must change the structure of the address field from a simple string to an object with street, city, and zip_code.
-
-Challenge: How do you roll out these changes without breaking existing clients that integrate with your API?
-
-What are the different strategies for versioning a REST API (e.g., URL path, request header, query parameter)?
-
-Which strategy is considered the most pragmatic and why?
-
-For the new last_login_date field (an additive change), is a new API version strictly necessary? Why or why not?
-
-For the breaking change to the address field, how would you implement and communicate the new version?
-
-7. Database (Choosing the Right Type)
-Scenario: You are designing a feature that stores and queries time-series data: millions of sensor readings every hour, each with a sensor_id, timestamp, and value. The primary use case is to quickly retrieve all readings for a specific sensor over a flexible time range (e.g., "last 6 hours," "last week").
-
-Challenge: Your initial implementation uses a relational database (e.g., PostgreSQL) with a table sensor_data(sensor_id, timestamp, value). The query performance is degrading rapidly as the table grows.
-
-Why is a relational SQL database struggling with this specific workload?
-
-What type of database (e.g., Time-Series, NoSQL) would be more appropriate and why?
-
-How would the data model and query patterns differ in this new database?
-
-What are the potential trade-offs of moving to a specialized database?
 
 8. System Design (Rate Limiting & Scalability)
 Scenario: You have a critical but expensive API endpoint that performs a complex calculation. A single bad actor or a misconfigured client could send a high volume of requests, overwhelming the service and causing a Denial-of-Service (DoS) for legitimate users.
