@@ -57,6 +57,22 @@ for index, fruit in enumerate(fruits):
 # 2 cherry cherry
 
 
+# Default dic
+
+counts = {}
+for word in ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']:
+    if word not in counts:
+        counts[word] = 0
+    counts[word] += 1
+# counts is {'apple': 3, 'banana': 2, 'orange': 1}
+
+from collections import defaultdict
+
+counts = defaultdict(int)
+for word in ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']:
+    counts[word] += 1  # Accessing 'apple' for the first time creates counts['apple'] = 0, then it becomes 1.
+# counts is defaultdict(<class 'int'>, {'apple': 3, 'banana': 2, 'orange': 1})
+
 
 # zip(*iterables) – Combine multiple iterables element-wise
 names = ['Alice', 'Bob']
