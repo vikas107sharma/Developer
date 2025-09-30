@@ -1,0 +1,32 @@
+
+// ❌ ONE connection for entire application
+const connection = mysql.createConnection(config);
+// After 8 hours idle: DEAD - throws fatal error
+connection.query(...) // Fails!
+
+
+// ✅ MULTIPLE connections managed dynamically  
+const pool = mysql.createPool({
+  connectionLimit: 10,
+  acquireTimeout: 60000
+});
+
+pool.getConnection((err, connection) => {
+  // 🎯 POOL gives you a FRESH, ACTIVE connection
+  connection.query(...) // Always works!
+  connection.release(); // Return to pool
+});
+
+
+// Pool starts with 0 connections
+
+// First call - creates new connection
+pool.getConnection() // → Creates Connection #1
+
+// Second call - creates another new connection  
+pool.getConnection() // → Creates Connection #2
+
+// Third call - REUSES Connection #1 (if it was released)
+pool.getConnection() // → Reuses Connection #1
+
+// If all 10 connections are busy, it waits for one to be free
