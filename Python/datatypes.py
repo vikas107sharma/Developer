@@ -48,54 +48,15 @@ print(nums)
 
 
 
-# Looping on list: enumerate(iterable) – Get index and value while looping
-fruits = ['apple', 'banana', 'cherry']
-for index, fruit in enumerate(fruits):
-    print(index, fruit, fruits[index])
-# 0 apple apple
-# 1 banana banana
-# 2 cherry cherry
-
-
-# Default dic
-
-counts = {}
-for word in ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']:
-    if word not in counts:
-        counts[word] = 0
-    counts[word] += 1
-# counts is {'apple': 3, 'banana': 2, 'orange': 1}
-
-from collections import defaultdict
-
-counts = defaultdict(int)
-for word in ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']:
-    counts[word] += 1  # Accessing 'apple' for the first time creates counts['apple'] = 0, then it becomes 1.
-# counts is defaultdict(<class 'int'>, {'apple': 3, 'banana': 2, 'orange': 1})
-
-
-# zip(*iterables) – Combine multiple iterables element-wise
-names = ['Alice', 'Bob']
-scores = [85, 92]
-for name, score in zip(names, scores):
-    print(name, score)
-
-
-# Looping on objects
-d = {'a': 1, 'b': 2, 'c': 3}
-for key, val in d.items():
-    print(key, val)
-
-
-
-values = [0, False, 5]
-print(any(values))  # True (because 5 is truthy)
-
-flags = [True, 1, "yes"]
-print(all(flags))  # True
-flags = [True, 0, "yes"]
-print(all(flags))  # False (0 is falsy)
-
+# 🗃️ Dictionary Methods
+d = {'a': 1, 'b': 2}
+d.get('a')              # Get value or None
+d.keys()                # Get all keys
+d.values()              # Get all values
+d.items()               # Get (key, value) pairs
+d.update({'c': 3})      # Merge another dict
+d.pop('b')              # Remove key and return value
+d.clear()               # Remove all items
 
 
 # string slicing
@@ -143,24 +104,13 @@ s.remove(2)          # Remove element (error if not present)
 s.pop()              # Remove and return random item
 s.clear()            # Empty the set
 
+
 # Set operations
 a = {1, 2, 3}
 b = {3, 4, 5}
 a.union(b)           # {1, 2, 3, 4, 5}
 a.intersection(b)    # {3}
 a.difference(b)      # {1, 2}
-
-
-
-# 🗃️ Dictionary Methods
-d = {'a': 1, 'b': 2}
-d.get('a')              # Get value or None
-d.keys()                # Get all keys
-d.values()              # Get all values
-d.items()               # Get (key, value) pairs
-d.update({'c': 3})      # Merge another dict
-d.pop('b')              # Remove key and return value
-d.clear()               # Remove all items
 
 
 
@@ -175,4 +125,15 @@ s.split()               # ['hello', 'world']
 s.join(['a', 'b'])      # 'a b'
 s.startswith("he")      # True
 s.endswith("ld")        # True
+
+
+
+# Any, Some
+values = [0, False, 5]
+print(any(values))  # True (because 5 is truthy)
+
+flags = [True, 1, "yes"]
+print(all(flags))  # True
+flags = [True, 0, "yes"]
+print(all(flags))  # False (0 is falsy)
 
