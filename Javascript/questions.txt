@@ -1,0 +1,180 @@
+I'll scan your codebase to understand the domain and where arrays are processed, then craft a set of more complex, domain-aligned questions like your examples (map/filter/reduce pipelines, deduping, joins, windowed aggregations, etc.). First, I’ll search for relevant modules and array method usage.
+
+I explored your backend to align with your domain objects (orders, shipments, AWBs, SKUs, returns, EDD, tracking). Below are 10 progressively harder, real-world exercises focused on .map(), .filter(), .reduce(), .flatMap(), and join-like transforms.
+
+# Advanced Array Method Challenges
+
+- **[1] Join Tracking to SKUs: Latest Status per SKU**
+  Problem: Given shipments and tracking events by AWB, produce latest status per SKU.
+  Input:
+  ```js
+  const shipments = [
+    { awb: "A1", line_items: [{ sku: "SKU1" }, { sku: "SKU2" }] },
+    { awb: "A2", line_items: [{ sku: "SKU3" }] }
+  ];
+  const tracking = [
+    { awb: "A1", events: [{ code: 10, ts: 1 }, { code: 35, ts: 3 }] },
+    { awb: "A2", events: [{ code: 10, ts: 2 }, { code: 28, ts: 4 }] }
+  ];
+  ```
+  Output:
+  ```js
+  { SKU1: { code: 35, ts: 3 }, SKU2: { code: 35, ts: 3 }, SKU3: { code: 28, ts: 4 } }
+  ```
+  Hint: Build awb->latestEvent with reduce; flatMap line_items to map SKUs.
+
+- **[2] Order Totals with COD Fee and Per-Shipment Totals**
+  Problem: Compute per-shipment totals (sum price - discount), order total, and add delivery_fee (19) if any shipment paymentMode is COD.
+  Input:
+  ```js
+  const shipments = [
+    { paymentMode: "PREPAID", line_items: [{ price: 200, discount: 20, quantity: 1 }] },
+    { paymentMode: "COD",     line_items: [{ price: 100, discount: 0,  quantity: 2 }] }
+  ];
+  ```
+  Output:
+  ```js
+  {
+    shipments: [ { total: 180 }, { total: 200 } ],
+    orderTotal: 380,
+    delivery_fee: 19
+  }
+  ```
+  Hint: map -> per-shipment totals; some() for COD; reduce() for order total.
+
+- **[3] Sanitize and Group SKUs by Base Code**
+  Problem: Strip suffixes [CMD, REW, 23NE, WBOGO, SALE, FG, BXGY, BBB25] and group originals under baseSku.
+  Input:
+  ```js
+  const items = [ "FOO123CMD", "FOO123", "BAR10REW", "BAR10", "ZED99SALE" ];
+  ```
+  Output:
+  ```js
+  { FOO123: ["FOO123CMD","FOO123"], BAR10: ["BAR10REW","BAR10"], ZED99: ["ZED99SALE"] }
+  ```
+  Hint: reduce() with a sanitize function.
+
+- **[4] Warehouses for Non-Gift Cart SKUs**
+  Problem: From cart items with tags and a sku->warehouse map, return unique warehouses for items that are NOT gifts.
+  Input:
+  ```js
+  const cart = [
+    { sku: "S1", tags: ["Dog"] },
+    { sku: "S2", tags: ["GIFT_V2"] },
+    { sku: "S3", tags: ["Cat"] }
+  ];
+  const allocation = { S1: { warehouse: "BLR" }, S2: { warehouse: "DEL" }, S3: { warehouse: "MUM" } };
+  const GIFT_TAGS_V2 = ["GIFT_V2","GIFT"];
+  ```
+  Output:
+  ```js
+  ["BLR","MUM"]
+  ```
+  Hint: filter.every() against GIFT_TAGS_V2; map -> warehouses; Set for dedupe.
+
+- **[5] Return Shipments Aggregation by Return Request**
+  Problem: Merge return items into virtual “return shipments” keyed by return_request_id; sum quantity and refundedAmount per SKU, carry last updatedAt.
+  Input:
+  ```js
+  const returns = [
+    { clickpostReturnId: "R1", sku: "SKU1", quantity: 1, refundAmount: 50, updatedAt: 20, status: "pickup_scheduled" },
+    { clickpostReturnId: "R1", sku: "SKU1", quantity: 2, refundAmount: 100, updatedAt: 30, status: "picked_up" },
+    { clickpostReturnId: "R2", sku: "SKU2", quantity: 1, refundAmount: 70, updatedAt: 25, status: "approved" }
+  ];
+  ```
+  Output:
+  ```js
+  {
+    R1: { status: "picked_up", updatedAt: 30, line_items: [{ sku:"SKU1", quantity:3, refundedAmount:150 }] },
+    R2: { status: "approved",  updatedAt: 25, line_items: [{ sku:"SKU2", quantity:1, refundedAmount:70  }] }
+  }
+  ```
+  Hint: reduce() of nested maps (request -> sku).
+
+- **[6] EDD vs Delivered: Delay Classification with Revised EDD**
+  Problem: For each shipment, compute delayStatus = ["ON TIME","RUNNING DELAYED","EARLY","DELAYED"] using estimatedDeliveryTime, delivered_at, and revisedEdd[awb].
+  Input:
+  ```js
+  const shipments = [
+    { awb:"A1", estimated: 100, delivered_at: 95 },
+    { awb:"A2", estimated: 100, delivered_at: 110 }
+  ];
+  const revisedEdd = { A2: 108 };
+  ```
+  Output:
+  ```js
+  [
+    { awb:"A1", delayStatus:"EARLY" },
+    { awb:"A2", delayStatus:"DELAYED", revisedTo:108 }
+  ]
+  ```
+  Hint: map with conditional logic; prefer revised EDD when present.
+
+- **[7] Cancellation Eligibility**
+  Problem: cancellable = false if any tracking event has status_code 28, or shipment delivered, or order canceled.
+  Input:
+  ```js
+  const order = { cancelled_at: null };
+  const shipments = [{ delivered_at: null }, { delivered_at: null }];
+  const tracking = [{ status_code: 10 }, { status_code: 28 }];
+  ```
+  Output:
+  ```js
+  false
+  ```
+  Hint: some() across arrays; short-circuit evaluation.
+
+- **[8] Order Status Derivation from Fulfillments**
+  Problem: Given orders with fulfillments (shipment_status), set shipmentStatus: "Cancelled" if cancelled_at; else "Delivered" if any fulfillment delivered; else "Shipped" if any fulfillment exists; else "Yet To Be Shipped".
+  Input:
+  ```js
+  const orders = [
+    { id:1, cancelled_at:null, fulfillments:[{ shipment_status:"delivered" }] },
+    { id:2, cancelled_at:null, fulfillments:[] }
+  ];
+  ```
+  Output:
+  ```js
+  [
+    { id:1, shipmentStatus:"Delivered" },
+    { id:2, shipmentStatus:"Yet To Be Shipped" }
+  ]
+  ```
+  Hint: map() with nested some() checks.
+
+- **[9] Top-N Product Types from Tags**
+  Problem: Count products by tag prefix "Product Type:" and return top 2 types with counts.
+  Input:
+  ```js
+  const items = [
+    { tags:["Product Type:Litter","Food/non-food: Food"] },
+    { tags:["Product Type:Litter"] },
+    { tags:["Product Type:Treats"] }
+  ];
+  ```
+  Output:
+  ```js
+  [ { type:"Litter", count:2 }, { type:"Treats", count:1 } ]
+  ```
+  Hint: flatMap tags -> filter startsWith -> reduce to counts -> sort -> slice.
+
+- **[10] Latest Record Per Key from Mixed Updates**
+  Problem: From EDD updates across SKUs, keep latest per sku by updatedAt, but discard records where edd is null.
+  Input:
+  ```js
+  const eddUpdates = [
+    { sku:"A1", edd:"2025-01-05", updatedAt:10 },
+    { sku:"A1", edd:null,        updatedAt:20 },
+    { sku:"B1", edd:"2025-02-02",updatedAt:5  }
+  ];
+  ```
+  Output:
+  ```js
+  { A1:{ sku:"A1", edd:"2025-01-05", updatedAt:10 }, B1:{ sku:"B1", edd:"2025-02-02", updatedAt:5 } }
+  ```
+  Hint: reduce() with guard (skip null edd), compare timestamps.
+
+# Want solutions?
+If you want, I can provide concise solution functions for any subset, or bundle them into a single runnable examples file mirroring your format. 
+
+Summary: I reviewed your domain code paths and drafted 10 complex, domain-aligned array-method challenges with inputs/outputs and hints.

@@ -21,6 +21,12 @@ function example1_FormatOrders() {
     { id: 1, amount: 1200, createdAt: "2025-11-15T12:00:00Z" },
     { id: 2, amount: 900,  createdAt: "2025-11-16T14:30:00Z" }
   ];
+  /*
+  [
+    { orderId: 1, amount: 1200, date: "11/15/2025" },
+    { orderId: 2, amount: 900,  date: "11/16/2025" }
+  ]
+  */
 
   // API formatting using map
   const formatted = orders.map(o => ({
@@ -30,12 +36,6 @@ function example1_FormatOrders() {
   }));
 
   console.log(formatted);
-  /*
-  [
-    { orderId: 1, amount: 1200, date: "11/15/2025" },
-    { orderId: 2, amount: 900,  date: "11/16/2025" }
-  ]
-  */
 }
 
 
@@ -49,13 +49,13 @@ function example2_FilterOrders() {
     { id: 2, status: 'PENDING', amount: 900 },
     { id: 3, status: 'DELIVERED', amount: 800 },
   ];
+  // [ { id: 1, status: "DELIVERED", amount: 1200 } ]
 
   const filtered = orders.filter(o =>
     o.status === 'DELIVERED' && o.amount > 1000
   );
 
   console.log(filtered);
-  // [ { id: 1, status: "DELIVERED", amount: 1200 } ]
 }
 
 
@@ -70,21 +70,6 @@ function example3_GroupShipments() {
     { id: 3, status: "DELIVERED" },
     { id: 4, status: "PENDING" }
   ];
-
-  const grouped = shipments.reduce((acc, s) => {
-      // NOTE: The original code `push(s.id)` would produce:
-      // { DELIVERED: [1, 3], DELAYED: [2], PENDING: [4] }
-      // The original output comment below seems to expect `push(s)`.
-      // The code is preserved exactly as requested.
-      
-      if (!acc[s.status]) {
-          acc[s.status] = []; // Create an empty array if this status is new
-      }
-      acc[s.status].push(s.id);
-      return acc; // Added return acc to make reduce work correctly
-  }, {});
-
-  console.log(grouped);
   /*
   {
     DELIVERED: [ {id:1}, {id:3} ],
@@ -94,6 +79,16 @@ function example3_GroupShipments() {
   */
   // Note: Actual output from the code as-written will be:
   // { DELIVERED: [ 1, 3 ], DELAYED: [ 2 ], PENDING: [ 4 ] }
+
+  const grouped = shipments.reduce((acc, s) => {
+      if (!acc[s.status]) {
+          acc[s.status] = []; // Create an empty array if this status is new
+      }
+      acc[s.status].push(s.id);
+      return acc; // Added return acc to make reduce work correctly
+  }, {});
+
+  console.log(grouped);
 }
 
 
@@ -108,17 +103,6 @@ function example4_ChainedPipeline() {
     { sku: "B1", status: "RUNNING DELAYED", dayCount: 3 },
     { sku: "C1", status: "RUNNING DELAYED", dayCount: 2 },
   ];
-
-  const result = shipments
-    .filter(s => s.status === "RUNNING DELAYED")
-    .map(s => ({ ...s, message: `Delayed by ${s.dayCount} days` }))
-    .reduce((acc, s) => {
-      acc.count++;
-      acc.messages.push(s.message);
-      return acc;
-    }, { count: 0, messages: [] });
-
-  console.log(result);
   /*
   {
     count: 2,
@@ -128,6 +112,16 @@ function example4_ChainedPipeline() {
     ]
   }
   */
+  
+  const formatted = shipments.reduce((acc,s)=>{
+      if(s.status == "RUNNING DELAYED") {
+          acc.count++;
+          acc.message.push(`Delayed by ${s.dayCount} days`)
+      }
+      return acc
+  },{count: 0, message: []})
+  
+  console.log(formatted)
 }
 
 
@@ -142,6 +136,12 @@ function example5_GetLatestWithReduce() {
     { sku: "A1", edd: "2025-01-07", updatedAt: 20 }, // latest
     { sku: "B1", edd: "2025-02-02", updatedAt: 5 }
   ];
+  /*
+  {
+    A1: { sku: "A1", edd: "2025-01-07", updatedAt: 20 },
+    B1: { sku: "B1", edd: "2025-02-02", updatedAt: 5 }
+  }
+  */
 
   const latest = eddUpdates.reduce((acc, rec) => {
     const curr = acc[rec.sku];
@@ -152,13 +152,10 @@ function example5_GetLatestWithReduce() {
   }, {});
 
   console.log(latest);
-  /*
-  {
-    A1: { sku: "A1", edd: "2025-01-07", updatedAt: 20 },
-    B1: { sku: "B1", edd: "2025-02-02", updatedAt: 5 }
-  }
-  */
 }
+
+
+
 
 
 // --- Execute all examples ---
@@ -181,3 +178,6 @@ function runAll() {
 
 // Run all examples
 runAll();
+
+
+
