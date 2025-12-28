@@ -1,4 +1,5 @@
-import express from 'express';
+import express from 'express'; //  "type": "module" in package.json 
+// or use: const express = require('express')
 
 const app = express();
 const PORT = 3000;

@@ -1,0 +1,10 @@
+# The RUN npm install line in your Dockerfile runs, creating a fresh, Linux-compatible node_modules folder inside the container.
+node_modules 
+
+# Git files
+.git
+.gitignore
+
+# Dockerfile and dockerignore is required to build the image we do not need it inside the image
+Dockerfile
+.dockerignore
