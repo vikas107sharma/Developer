@@ -366,3 +366,34 @@ function createCache(ttlMs) {
 function requestLogger(req, res, next) {
   // TODO
 }
+
+
+/* =====================================================
+ * Q25. Write a file server.js and controller.js with sinple api apply middleware of auth
+ * =====================================================
+ * Problem:
+ * const express = require('express');
+    const router = express.Router();
+
+    router.get('/', (req,res)=>{
+        res.status(200).json({message: "success"});
+    })
+
+    module.exports = router;
+ *
+ * const express = require('express')
+    const test_router = require('./controller');
+    
+    const app = express();
+    
+    app.get("/", (req, res)=>{
+        res.status(200).json({message: "success"});
+    })
+    
+    app.use('/test', test_router);
+    
+    
+    app.listen(8000, ()=>{
+        console.log('Server is running on 8000');
+    })
+ */

@@ -105,3 +105,44 @@ Dockerfile — file containing instructions to build an image.
 Docker Hub — public registry for images.
 
 Docker Compose — tool to manage multi-container apps.
+
+
+
+
+Dockerfile.dev  -------------
+
+FROM node:19-alpine
+
+COPY package.json /app/
+COPY src /app/
+
+WORKDIR /app
+
+RUN npm install
+
+CMD [ "node", "server.js" ]
+
+
+Dockerfile.prod  ------------------------
+FROM node:19-alpine
+
+COPY package.json /app/
+COPY src /app/
+
+WORKDIR /app
+
+RUN npm install
+
+CMD [ "node", "server.js" ]
+
+
+Volumn mount -----------------
+If you have this in docker dompose. 
+volumes: - .:/app
+
+And this in Dockerfile
+WORKDIR /app 
+
+Then no need to rebuild untill you have't changed docker-compose or requirement.txt
+
+docker-compose restart myapp

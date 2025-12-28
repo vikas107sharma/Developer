@@ -1,0 +1,120 @@
+Problem Statement: Idempotent User Registration API
+Scenario
+
+You are building a user registration API for a web service. The registration process involves multiple steps:
+
+Validate Request
+
+Ensure email, username, and password are valid.
+
+Store Logs
+
+Log the registration attempt in a system for auditing.
+
+Create User
+
+Insert user into the database (with unique constraint on email/username).
+
+Send Welcome Notification
+
+Send a welcome email or message (can fail due to external service).
+
+The API may fail mid-way, e.g., after logging but before creating the user. You must implement retry-safe, idempotent behavior using Redis.
+
+Requirements
+1. Idempotency
+
+Each client request must include a unique Idempotency-Key.
+
+If the request fails mid-way, retrying with the same key should:
+
+Not create duplicate users.
+
+Not send duplicate notifications.
+
+Resume from the last incomplete step if possible.
+
+2. Redis
+
+Use Redis to track request status and step completion.
+
+Redis key structure (example):
+
+idempotency:{key} = {
+  "status": "in_progress" | "success" | "failed",
+  "steps": {
+    "validation": true,
+    "logs": true,
+    "user_created": false,
+    "notification_sent": false
+  },
+  "result": {
+    "user_id": null
+  }
+}
+
+3. Database
+
+Use any DB (SQLite/Postgres/MongoDB).
+
+Ensure unique constraints on email/username for user creation.
+
+4. Retry Logic
+
+The client may retry any number of times with the same key.
+
+The server should resume incomplete steps safely.
+
+Steps that have already completed should not be repeated.
+
+API Spec
+POST /register
+
+Headers: Idempotency-Key: <UUID>
+
+Body:
+
+{
+  "email": "user@example.com",
+  "username": "myuser",
+  "password": "securepassword"
+}
+
+
+Response:
+
+{
+  "user_id": 123,
+  "status": "success"
+}
+
+
+Errors:
+
+400 → validation failed
+
+409 → email/username already exists
+
+500 → internal server error (retryable)
+
+Steps for Implementation
+
+Check Redis for idempotency-key.
+
+If status is success → return previous result.
+
+If in_progress → resume from last incomplete step.
+
+If not present → create a new record in Redis: in_progress.
+
+Validate input → mark validation: true in Redis.
+
+Store logs → mark logs: true in Redis.
+
+Create user → mark user_created: true in Redis.
+
+If user exists → treat as success.
+
+Send notification → mark notification_sent: true in Redis.
+
+Update Redis key: status: success, result: {user_id}.

@@ -365,3 +365,8 @@ def bulk_process():
 def get_users_with_orders(users, fetch_orders):
     # TODO
     pass
+
+
+def verify_auth_token():
+    ...
+
