@@ -1,0 +1,19 @@
+version: '3.8'
+
+# docker build -f .\Dockerfile -t app .
+# docker run -p 3000:3000 app 
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_URL=redis://cache:6379
+    volumes:
+      - .:/app  # This is a key-value pair for file syncing. It follows the format: [Source on your PC] : [Destination in Container]
+      - /app/node_modules # Your local node_modules was built for your host OS (likely Windows), but the container runs Linux Alpine # Prevent overwriting container's node_modules
+
+  cache:
+    image: redis:alpine  # Pulls the official lightweight Redis image
+    ports:
+      - "6379:6379"

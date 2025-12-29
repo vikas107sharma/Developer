@@ -1,0 +1,27 @@
+# Single stage image size was: 129.88 MB
+# now it is: 129.05 MB
+
+# --- STAGE 1: Build Stage ---
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+# Copy only what we need for installing dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy everything else and build (if you had a build step)
+COPY . .
+
+# --- STAGE 2: Run Stage ---
+FROM node:18-alpine AS runner
+WORKDIR /app
+
+# IMPORTANT: We only copy the necessary files from the "builder" stage
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/index.js ./
+
+EXPOSE 3000
+
+# Start the app
+CMD ["node", "index.js"]

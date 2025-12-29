@@ -7,4 +7,5 @@ node_modules
 
 # Dockerfile and dockerignore is required to build the image we do not need it inside the image
 Dockerfile
+Dockerfile.multistage
 .dockerignore

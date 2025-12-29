@@ -25,15 +25,8 @@ COPY . ./
 EXPOSE 3000 
 
 # Run index.js (which is now at /app/index.js)
-CMD [ "node", "index.js" ]
+CMD [ "npm", "start" ]
 
-
-
-
-
-
-
-# ---->  Start from here 
-# https://gemini.google.com/app/ce8241ffee756f5c?is_sa=1&is_sa=1&android-min-version=301356232&ios-min-version=322.0&campaign_id=bkws&utm_source=sem&utm_source=google&utm_medium=paid-media&utm_medium=cpc&utm_campaign=bkws&utm_campaign=2024enIN_gemfeb&pt=9008&mt=8&ct=p-growth-sem-bkws&gclsrc=aw.ds&gad_source=1&gad_campaignid=20357620749&gbraid=0AAAAApk5BhmK85tvxyyb0bxZa-f1Quu0D&gclid=Cj0KCQiAx8PKBhD1ARIsAKsmGbdnfq_hP5dRMYL8ghCeZMojFv9fNh2zTgmRe7tR03krADRQ0Xe3_K4aAqsiEALw_wcB
-# Multistage build
-# Docker compose (network, volumes)
+# To use nodemon 
+# put "start": "nodemon index.js" in package.json
+# you directly can't write CMD [ "nodemon", "index.js" ]
