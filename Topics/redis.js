@@ -38,6 +38,20 @@ await client.rPush("job:queue", "job2");
 console.log("LIST LRANGE:", await client.lRange("job:queue", 0, -1));
 console.log("LIST LPOP:", await client.lPop("job:queue"));
 
+/* ======================================================
+   LIST (Blocking)
+   One-liner: Blocking list ops wait until data is available or timeout occurs.
+   Use when: Worker/consumer queues to avoid polling and busy loops.
+   Methods: BLPOP, BRPOP (block on read)
+   Note: No BLPUSH/BRPUSH in Redis — only blocking pops exist.
+====================================================== */
+
+// Blocks until an item is available or timeout (seconds)
+const job = await client.blPop("job:queue", 0); // 0 = wait indefinitely
+await client.blPop("job:queue", 1); // wait up to 1 second
+await client.blPop("job:queue", 5); // wait up to 5 seconds
+console.log("BLOCKING POP:", job);
+
 
 /* ======================================================
    SET
