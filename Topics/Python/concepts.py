@@ -55,8 +55,8 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-@app.route('/api/data/<path:resource>', methods=['POST'])
-def handle_all(resource):
+@app.route('/api/data/<int:a>/<int:b>', methods=['POST'])
+def handle_all(a, b):
     
     # Extract headers
     headers = {
@@ -82,7 +82,7 @@ def handle_all(resource):
     
     return jsonify({
         'method': request.method,
-        'resource': resource,
+        'resource': a+b,
         'headers': headers,
         'query_params': query_params,
         'body_data': body_data,
@@ -92,7 +92,14 @@ def handle_all(resource):
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
+# is equivalent to:
+# app.run(host="127.0.0.1", port=5000, debug=True)
 
+# So Flask automatically runs on:
+# http://127.0.0.1:5000
+
+# Port 5000 is the default.
 
 
 # ----------------------------------------- API Call -----------------------------------------
@@ -145,11 +152,12 @@ for index, fruit in enumerate(fruits):
 
 
 # ----------------------------------------- dict -----------------------------------------
+words = ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']
 # Dic
 # Without defaultdict (using a regular dict):
 # You have to manually check if the key (the word) exists before you can increment its count.
 counts = {}  # or dict()
-for word in ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']:
+for word in words:
     if word not in counts:
         counts[word] = 0  # Manually initialize the count to 0
     counts[word] += 1
@@ -158,8 +166,6 @@ for word in ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']:
 
 # .get() is a very common pattern in Python when you don't want to import defaultdict or when you want to use a standard dictionary.
 counts = {} # Standard dictionary
-words = ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']
-
 for word in words:
     # counts.get(word, 0) looks for 'word'. 
     # If found, it returns the value. If not found, it returns 0.
