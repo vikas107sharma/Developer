@@ -30,7 +30,7 @@ class FlightTransport(Transportation):
 # TRANSPORT FACTORY
 class TransportFactory:
     @abstractmethod
-    def create_transport(mode):
+    def book_transport(mode):
         """Factory method to create transportation instances"""
         pass
 
