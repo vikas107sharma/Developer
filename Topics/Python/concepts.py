@@ -148,8 +148,31 @@ for index, fruit in enumerate(fruits):
 # 1 banana banana
 # 2 cherry cherry
 
+for fruit in fruits:
+    print(fruit)
 
 
+# ----------------------------------------- Object -----------------------------------------
+# Looping on objects
+students = {'id_A': 'Alice', 'id_B': 'Bob', 'id_C': 'Charlie'}
+
+# for k in my_dict:	Just the keys	k will be 'id_A', then 'id_B', etc.
+for key in students:
+    # You can use the key to access the value
+    name = students[key]
+    print(f"Key: {key}, Value: {name}")
+
+# for k, v in my_dict.items():	Both the key and value	k, v will be ('id_A', 'Alice'), etc.
+for key, val in students.items():
+    print(key, val)
+
+# for v in my_dict.values():	Just the values	v will be 'Alice', then 'Bob', etc.
+for val in students.values():
+    print(val)
+
+# for k in my_dict.keys():
+for key in students.keys():
+    print(key)
 
 # ----------------------------------------- dict -----------------------------------------
 words = ['apple', 'banana', 'apple', 'orange', 'banana', 'apple']
@@ -196,25 +219,6 @@ students_by_grade['two'].append('Bob')
 students_by_grade['one'].append('Charlie')
 # print(students_by_grade)
 # defaultdict(<class 'list'>, {'one': ['Alice', 'Charlie'], 'two': ['Bob']})
-
-
-
-# Looping on objects
-students = {'id_A': 'Alice', 'id_B': 'Bob', 'id_C': 'Charlie'}
-
-# for k in my_dict:	Just the keys	k will be 'id_A', then 'id_B', etc.
-for key in students:
-    # You can use the key to access the value
-    name = students[key]
-    print(f"Key: {key}, Value: {name}")
-
-# for k, v in my_dict.items():	Both the key and value	k, v will be ('id_A', 'Alice'), etc.
-for key, val in students.items():
-    print(key, val)
-
-# for v in my_dict.values():	Just the values	v will be 'Alice', then 'Bob', etc.
-for val in students.values():
-    print(val)
 
 
 
