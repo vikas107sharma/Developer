@@ -1,3 +1,46 @@
+// CUSTOM FILTER, MAP
+
+Array.prototype.myFilter = function (callback) {
+  const result = []
+  for(const [i, v] of this.entries()) {
+    if(callback(v, i, this)) {
+      result.push(v)
+    }
+  }
+  return result;
+}
+
+Array.prototype.myMap = function (callback) {
+  const result = []
+  for (const [i, v] of this.entries()) {
+    const output = callback(v, i, this);
+    result.push(output)
+  }
+  return result
+}
+
+const arr = [1, 3, 4];
+
+console.log(arr.myFilter((val, index)=>
+  val%2 == index+1
+))
+
+console.log(arr.myMap((val, index) => 
+  val * 2
+))
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * JavaScript Array Methods Examples
  *
