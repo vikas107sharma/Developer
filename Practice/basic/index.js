@@ -1,4 +1,4 @@
-// CUSTOM FILTER, MAP
+// CUSTOM FILTER, MAP, CONCAT
 
 Array.prototype.myFilter = function (callback) {
   const result = []
@@ -31,10 +31,42 @@ console.log(arr.myMap((val, index) =>
 
 
 
+Array.prototype.myConcat = function (...args) {
+    let result = [...this];
+
+    for (const v of args) {
+        if (Array.isArray(v)) {
+            result.push(...v);
+        } else {
+            result.push(v);
+        }
+    }
+
+    return result;
+};
+
+
+const arr = [1,2,3,4,5]
+
+console.log(arr.myConcat([6,7], null, undefined));
 
 
 
+const arr1 = [0, 1, 2, [3, 4]];
 
+console.log(arr1.flat());
+// expected output: Array [0, 1, 2, 3, 4]
+
+const arr2 = [0, 1, [2, [3, [4, 5]]]];
+
+console.log(arr2.flat());
+// expected output: Array [0, 1, 2, Array [3, Array [4, 5]]]
+
+console.log(arr2.flat(2));
+// expected output: Array [0, 1, 2, 3, Array [4, 5]]
+
+console.log(arr2.flat(Infinity));
+// expected output: Array [0, 1, 2, 3, 4, 5]
 
 
 
