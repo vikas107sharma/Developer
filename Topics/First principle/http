@@ -1,0 +1,40 @@
+Always use the correct methods
+GET POST PUT PATCH DELETE
+
+✅ CORS
+Imagine 
+Client: example.com
+Server: api.example.com
+
+1. Simple Request (GET, POST)
+GET/api/products/123 HTTP/1.1
+Host: api.anotherdomain.com
+Origin: https://example.com
+Accept: application/json   
+
+Response:
+HTTP/1.1 200 OK
+Content-Type: application/json
+Access-Control-Allow-Origin: https://example.com        [Allowed the origin]
+{
+    "product": {
+    "id": 123,
+    "name": "Example Product",
+    "price": 29.99
+}
+
+HTTP/1.1 200 OK
+Content-Type: application/json    [Server is on api.example.com and allow origin is not set, so in this case browser will block this, browser blocks the response being parsed, you will see cors error]
+{
+    'product": {
+    "id": 123,
+    "name": "Example Product",
+    price 29.99
+}
+
+
+2. Pre flight Request 
+This exist when one of these 3 true:
+a. Non-Standard HTTP Methods (PUT, DELETE, PATCH)
+b. Non-Standard Content-types (appliation/json)
+c. Custom Headers (Authorization, X-API-Key)
