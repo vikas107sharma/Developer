@@ -1,0 +1,182 @@
+✅✅✅✅✅✅✅✅✅✅ Basic ✅✅✅✅✅✅✅✅✅✅
+
+Username and password are sent with every request.
+
+Format:
+Authorization: Basic <Base64(username:password)>
+
+DRAWBACKS:
+Credentials sent on every request.
+Base64 is encoding, not encryption.
+Must use HTTPS, otherwise credentials can be stolen.
+No logout/session management.
+Poor scalability for modern systems/mobile apps.
+
+✅✅✅✅✅✅✅✅✅✅ SESSION ✅✅✅✅✅✅✅✅✅✅
+
+When the user logs in, the server creates a session ID and sends it to the user. This ID is stored in a cookie and is then passed with all subsequent requests.
+Server stores the session ID in Redis instead of database
+
+DRAWBACKS:
+1. Storing session data for millions of users consumes significant server memory.
+2. Poor horizontal scalability — requires shared session store (Redis/DB) across multiple servers. 
+3. Redis/session DB failure can break authentication.
+
+
+✅✅✅✅✅✅✅✅✅✅ JWT ✅✅✅✅✅✅✅✅✅✅
+
+Login → User sends username/password once
+Server → Generates JWT token
+Client → Stores token
+Client → Sends token in every request
+Authorization: Bearer <jwt_token>
+Server → Validates token using secret/private key
+
+Three parts:
+Header + Payload (JSON) + Signature 
+
+1. No server side storage cost 
+2. Scalability in distributed or microservice architecture
+
+DRAWBACKS
+1. Token can be stolen and misused 
+2. Stateless: Revoke user access (untill it expires automatically)
+
+Algorithm:
+HS256: Same secret key, sign and verify
+RS256: Private key sign, public key verify
+
+Header
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+
+Payload (JSON)
+{
+  "sub": "1234567890",
+  "name": "John Doe",
+  "admin": true,
+  "iat": 1516239022
+}
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
+
+======================== Logout ========================
+
+In JWT-based authentication:
+Logout usually happens only on client side.
+Browser/app deletes the JWT locally.
+But server does not track issued tokens (stateless).
+
+So if attacker already stole the JWT before logout:
+
+they can still use it until:
+Token expires, or
+Server explicitly blocks/revokes it.
+
+SOLUTION:
+1. Critical functions:
+User logout -> Store jwt id in Redis
+Next request -> Signature check + Token expiry + Redis Invalid Check
+
+2. Access Token / Refresh Token:
+Short-lived access tokens (5–15 min)
+Refresh tokens
+Token blacklist/blocklist in Redis/DB
+
+Otherwise “logout” is mostly fake from server perspective.
+
+======================== Revoke users (Logged out from backend) ========================
+1. Change the secret key: It will log out all the users
+2. Hybrid: use both stateless and stateful -> verify jwt then confirm this with blocklist stored in db
+
+? The whole point is if you have to use persistence storage why not use stateful approach in the first place  
+
+
+✅✅✅✅✅✅✅✅✅✅ API KEY AUTHENTICATION ✅✅✅✅✅✅✅✅✅✅
+
+Client sends a unique API key with every request.
+x-api-key: sk_live_xxxxx
+
+Server verifies the API key before allowing access.
+
+Used mainly for:
+Server-to-server communication
+Internal services
+Third-party integrations
+
+ADVANTAGES
+Simple and fast
+No session management needed
+Good for backend services and public APIs
+
+DRAWBACKS
+If API key is leaked, attacker gets access
+Usually identifies application, not actual user
+Hard to manage fine-grained permissions at scale
+
+BEST PRACTICES
+Store hashed API keys in DB
+Use HTTPS only
+Add rate limiting
+Rotate keys periodically
+Never expose secret keys in frontend
+
+
+✅✅✅✅✅✅✅✅✅✅ OAUTH 2.0 / OPENID CONNECT (OIDC) ✅✅✅✅✅✅✅✅✅✅
+
+What problem it solves:
+1. The more sites you visits the more password you need to remember.
+(Reusing password was very common so if on some malicious site you put your same password which you have given to other sites also you will be hacked)
+2. Fatigue: Managing huge number of accounts and password for any normal person
+
+OAuth 2.0 is an authorization framework.
+
+Example:
+“Login with Google” 
+
+Instead of sharing password with your app:
+
+User authenticates with Google
+Google gives access token to your app
+App accesses allowed resources on behalf of user
+
+Roles:
+Resource Owner → User
+Client → Your application
+Authorization Server → Google/Auth provider
+Resource Server → API server
+
+TOKENS
+Access Token → used to access APIs
+Refresh Token → used to get new access token
+ID Token (OIDC) → contains user identity information
+
+OIDC = Authentication layer on top of OAuth 2.0
+
+OAuth 2.0 → Authorization
+OIDC → Authentication + user identity
+
+ADVANTAGES
+User passwords are not shared with third-party apps
+Centralized login system
+Supports SSO (Single Sign-On)
+
+DRAWBACKS
+Complex implementation
+Token leakage risk
+Dependency on external auth provider
+
+EXAMPLE FLOW
+User clicks “Login with Google”
+Redirect to Google login
+Google authenticates user
+Google sends authorization code
+Backend exchanges code for tokens
+User logged in
+
+✅✅✅✅✅✅✅✅✅✅ Security Issues ✅✅✅✅✅✅✅✅✅✅
+
+1. Do not return friendly error: Username is wrong or Password is incorrect, Always return either username or password is incorrect.
+2. Comparing password is slower due to cpu based encryption: If username is wrong response is faster but if the password is wrong response is slower, using that parameter the delay attacker can know that either username or password is wrong.
+You must take measures to equalize the response time.
