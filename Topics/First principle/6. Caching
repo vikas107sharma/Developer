@@ -1,0 +1,157 @@
+✅✅✅✅✅✅✅✅✅✅ Caching ✅✅✅✅✅✅✅✅✅✅
+
+1. What caching actually is
+
+Caching = storing precomputed/frequently-used data closer to computation.
+Reduce latency
+Reduce DB load
+Increase throughput
+
+DB bottlenecks:
+
+disk I/O
+locks
+connection limits
+expensive joins
+aggregation
+repeated reads
+
+SELECT * FROM products WHERE id = 10;
+If requested 50k/sec:
+
+DB melts
+CPU spikes
+buffer pool churn
+lock contention increases
+
+======================== Types of caching ========================
+
+A. Client-side cache
+Browser/mobile cache.
+
+B. CDN cache (Cloudflare)
+Edge locations cache static assets.
+images
+JS bundles
+videos
+
+C. Application cache (backend)
+Redis
+Memcached
+
+D. Database cache
+buffer pool
+query cache
+page cache
+
+Why query becomes faster second time?
+Because pages are in memory.
+
+======================== Cache Patterns ========================
+https://www.youtube.com/shorts/6ilTc2ayWDY
+C:\Developer\Developer\Topics\First principle\assets\caching.png
+
+
+======================== Eviction policies ========================
+
+LRU
+Least recently used removed.
+Good general-purpose.
+
+LFU
+Least frequently used.
+Better for stable hot keys.
+
+TTL eviction
+Expired first.
+
+noeviction
+Writes fail when memory full.
+Critical for reliability-sensitive systems.
+
+======================== Cache invalidation ========================
+
+A. TTL based
+SET user:1 data EX 300
+Easy but stale window exists.
+
+B. Explicit invalidation 
+On update:
+await db.update(...);
+await redis.del(`user:${id}`);
+Next read reloads fresh value.
+Better than long TTLs.
+
+Correct ordering
+Usually:
+1. update DB
+2. delete cache
+
+NOT:
+delete cache
+update DB
+
+Why?
+Because concurrent readers can repopulate old data.
+
+======================== Cache stampede ========================
+
+Cache expires.
+1000 requests arrive simultaneously.
+All hit DB.
+DB dies.
+-> thundering herd
+
+Solutions
+A. Mutex locking
+Only one request rebuilds cache.
+Others wait/retry.
+
+B. Request coalescing
+Merge concurrent requests.
+
+C. Stale-while-revalidate
+Serve stale data temporarily.
+Background refresh.
+
+D. Jitter TTL
+all keys expire at 12:00
+
+ttl = 300 + random(0, 60)
+Prevents synchronized expiry.
+
+======================== Hot keys ========================
+
+One key gets huge traffic.
+
+celebrity profile
+flash sale product
+
+Problem:
+single Redis node bottleneck
+uneven load
+
+Solutions:
+local in-memory cache
+replication
+key sharding
+request collapsing
+
+======================== Open Questions ========================
+
+Real interview architecture answer
+
+Example:
+
+Design Instagram feed cache.
+
+Good answer includes:
+
+cache-aside
+Redis cluster
+fanout-on-write/read
+hot key mitigation
+TTL
+async refresh
+pagination cache strategy
+invalidation policy
