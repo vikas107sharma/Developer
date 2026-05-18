@@ -1,0 +1,189 @@
+
+✅✅✅✅✅✅✅✅✅✅ Microservices ✅✅✅✅✅✅✅✅✅✅
+A monolith keeps all modules inside a single application.
+Orders + Payments + Notifications + Auth
+run and deploy together.
+
+Advantages
+Single deployment
+Easier local development and debugging
+Simple communication between modules (function calls)
+Easier transactions and consistency
+Lower operational complexity
+Easier monitoring/logging initially
+
+Internal calls are simple:
+function calls
+instead of network calls.
+
+Drawbacks of Monoliths
+1. Deployment Dependencies
+Even a small change requires redeploying the entire application.
+
+2. Scaling Problems
+Suppose only the Orders module becomes heavy.
+With monolith scaling:
+Orders + Payments + Notifications
+all scale together even if only Orders needs more resources.
+This wastes CPU and memory.
+
+3. Tech Stack Constraints
+Different workloads may require different technologies.
+
+Example:
+multithreading → Go
+CSV/Excel processing → Python
+Monolith forces everything into one stack.
+
+======================== Drawbacks of Microservices ========================
+1. Network Overhead
+Internal function calls become network calls.
+Orders Service -> Payments Service
+
+Now you have:
+HTTP/gRPC latency
+retries
+timeouts
+partial failures
+
+A simple function call becomes distributed communication.
+
+2. Distributed System Complexity
+Load Balancer
+-> Routing Layer
+-> Orders Service
+-> Payments Service
+-> Notification Service
+
+Debugging becomes difficult because requests pass through multiple services.
+
+3. Data Inconsistency
+Each service usually owns its own database.
+Orders DB
+Payments DB
+Users DB
+Cross-service transactions become difficult.
+
+Problems:
+eventual consistency
+partial failures
+duplicate events
+distributed transaction complexity
+
+Payment succeeds
+Order update fails
+
+✅✅✅✅✅✅✅✅✅✅ Serverless Architecture ✅✅✅✅✅✅✅✅✅✅
+In traditional infrastructure, we manually decide:
+CPU
+RAM
+machine size
+8 GB RAM, 2 CPUs
+
+Choosing the correct machine size is difficult because traffic changes over time.
+
+Normal traffic vs sale traffic
+Auto Scaling
+One solution is auto scaling.
+
+Problem
+CPU > 70% -> start new server
+Auto scaling is reactive.
+Starting a new server takes time:
+
+VM/container boot
+OS startup
+loading application code
+dependency initialization
+
+During sudden traffic spikes, requests may fail before new servers become ready.
+
+======================== Serverless ========================
+
+In serverless architecture:
+developers only provide code
+cloud provider manages servers and infrastructure
+
+Code is deployed as:
+Functions
+Functions run when triggered by events:
+
+HTTP request
+queue message
+file upload
+cron job
+
+You pay only for:
+execution/processing time
+
+No need to manage:
+servers
+OS
+scaling
+provisioning
+
+Common platforms:
+Amazon Web Services Lambda
+Cloudflare Workers
+Google Cloud Functions
+
+1. Cold Starts
+If no function instance is running, the platform must:
+start runtime/container/VM
+load code
+initialize dependencies
+
+This delay is called:
+Cold Start
+Optimization
+
+Modern platforms reduce startup time using:
+lightweight VMs
+V8 isolates
+prewarmed containers
+
+Example:
+Cloudflare Workers uses V8 isolates with extremely low startup time.
+
+Language Impact
+Languages like:
+JavaScript
+Python
+usually have lower cold starts because startup is lightweight.
+
+Languages like:
+Java
+.NET
+often have slower cold starts due to heavier runtime initialization (JVM, CLR).
+
+2. Execution Limits
+Serverless functions usually have execution time limits.
+
+AWS Lambda max execution time:
+15 minutes
+
+Not suitable for:
+long-running processes
+persistent workers
+
+3. Stateless Nature
+Serverless functions are designed to be stateless.
+Problems with:
+persistent DB connections
+WebSockets
+in-memory sessions
+long-lived TCP state
+
+Each invocation should ideally be independent.
+
+Excellent for:
+image/video processing
+file conversion
+queue consumers
+cron jobs
+event-driven workloads
+
+Example:
+Upload video -> trigger Lambda -> process video
+
+Especially useful for heavy workloads that run occasionally instead of continuously.

@@ -71,16 +71,18 @@ Critical for reliability-sensitive systems.
 
 ======================== Cache invalidation ========================
 
-A. TTL based
+A. TTL based (Time based)
 SET user:1 data EX 300
 Easy but stale window exists.
+Problem: Figuring out the optimal amount of time.
 
-B. Explicit invalidation 
+B. Explicit invalidation (Event based)
 On update:
 await db.update(...);
 await redis.del(`user:${id}`);
 Next read reloads fresh value.
 Better than long TTLs.
+Problem: At every instance where you are updating user data, you have to invalidate cache.
 
 Correct ordering
 Usually:
@@ -93,6 +95,55 @@ update DB
 
 Why?
 Because concurrent readers can repopulate old data.
+
+C. Local Caching
+Cache stored inside application memory.
+const cache = new Map();
+
+Easy and extremely fast.
+Problem:
+Each server has its own cache.
+Server A cache != Server B cache
+Cache is also lost after restart/deployment.
+
+D. Distributed Caching (Redis / Memcached)
+Centralized cache shared across all servers.
+App Servers -> Redis -> Database
+
+Common tools:
+Redis
+Memcached
+
+Advantages:
+Shared cache across instances
+Reduces DB load
+Better consistency
+
+Problem:
+Network latency
+Cache invalidation complexity
+Extra infrastructure dependency
+
+Redis is more commonly used because it supports:
+TTL
+Pub/Sub
+Distributed locks
+Persistence
+Advanced data structures
+
+======================== Cache Hit Ratio ========================
+
+Percentage of requests served directly from cache instead of hitting the database.
+Cache Hit Ratio = Cache Hits / Total Requests
+
+Depends on:
+TTL duration
+Cache size
+Data access patterns
+Cache eviction strategy
+
+Example:
+90 cache hits out of 100 requests = 90% hit ratio
 
 ======================== Cache stampede ========================
 

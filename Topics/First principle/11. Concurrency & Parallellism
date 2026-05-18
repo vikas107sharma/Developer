@@ -1,0 +1,141 @@
+======================== IO Bound vs CPU Bound ========================
+IO Bound
+Time is mostly spent waiting for:
+DB queries
+external APIs
+file system
+network calls
+
+Example:
+API call -> wait 300ms
+CPU is mostly idle while waiting.
+For IO-heavy workloads, concurrency improves throughput significantly.
+
+CPU Bound
+Time is spent on computation.
+image/video processing
+encryption
+compression
+ML inference
+These tasks require actual CPU time and benefit from parallelism/multiple cores.
+
+======================== Threads ========================
+
+A thread is the smallest unit of execution managed by the OS.
+Each thread has:
+its own stack
+local variables
+instruction pointer/program counter
+
+The OS scheduler decides:
+which thread runs
+when it pauses
+when another thread resumes
+
+This is called:
+Preemptive Scheduling
+Thread A runs for few ms
+-> paused
+-> Thread B runs
+
+Processes vs Threads
+
+Processes
+completely isolated
+separate memory space
+Safer but heavier.
+
+Threads
+share same memory
+lightweight communication
+faster than processes
+
+Problem:
+Thread 1 modifies shared memory
+Thread 2 reads/writes same memory
+
+This can create:
+race conditions
+data corruption
+
+Context Switching
+Switching between threads requires:
+saving current state
+restoring another thread state
+updating instruction pointers/registers
+
+Too many threads:
+More context switches -> more overhead
+which can slow down the system.
+
+======================== Event Loop ========================
+
+Event loop handles concurrency differently.
+Instead of many OS threads:
+single thread handles many async tasks
+tasks yield control while waiting for IO
+
+Advantages:
+minimal context switching
+lower memory overhead
+efficient for IO-heavy systems
+
+Used heavily in:
+Node.js
+Race Condition in Async Code
+
+Example:
+balance = 100
+withdraw(100) #1
+withdraw(100) #2
+
+Flow:
+if balance >= 100:
+   await process()
+
+Both requests read old balance before update completes.
+
+Result:
+balance = -100
+
+This is a:
+Race Condition
+
+Solution
+Use:
+locks
+mutexes
+transactions
+atomic operations
+
+======================== Parallelism ========================
+
+Executing multiple instructions truly at the same time.
+
+Requires:
+Multiple CPU cores
+
+Example:
+Core 1 -> Task A
+Core 2 -> Task B
+
+Best for:
+CPU-heavy workloads
+======================== Concurrency ========================
+
+Structuring programs so multiple tasks can:
+start
+pause
+resume
+
+even if only one CPU core is executing at a moment.
+It creates the illusion of doing many things simultaneously.
+
+Example:
+Task A waiting for DB
+-> CPU executes Task B
+
+Concurrency is about:
+Dealing with multiple tasks
+Parallelism is about:
+Executing multiple tasks simultaneously

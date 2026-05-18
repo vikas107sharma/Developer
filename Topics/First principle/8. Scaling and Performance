@@ -1,0 +1,255 @@
+✅✅✅✅✅✅✅✅✅✅ Percentiles ✅✅✅✅✅✅✅✅✅✅
+
+P95
+95% of requests complete within this response time.
+Only the slowest 5% are slower.
+
+P99
+99% of requests complete within this response time.
+Represents tail latency and helps identify worst-case performance issues.
+
+Example:
+P95 = 200ms
+P99 = 2s
+This usually means most requests are fast, but a few are extremely slow.
+
+======================== Slowness is Not Always Database ========================
+Database queries are not always the bottleneck.
+
+Other common causes:
+JSON/XML serialization
+Large response payloads
+Network latency
+External API calls
+CPU-heavy processing (I/O bound tasks)
+Connection pool exhaustion
+Remote logging/monitoring calls
+
+Example:
+A synchronous logging call to Elasticsearch can slow requests even when DB queries are optimized.
+
+======================== Profiling ========================
+Profiling is the process of measuring where an application spends time, CPU, memory, or I/O.
+It helps identify the real bottleneck instead of guessing.
+
+
+
+✅✅✅✅✅✅✅✅✅✅ Scaling ✅✅✅✅✅✅✅✅✅✅
+Vertical Scaling (Scaling Up)
+Increasing resources of the same server:
+More CPU
+More RAM
+Better SSD
+
+Example:
+8 GB RAM -> 64 GB RAM
+
+A server with twice the power is often cheaper and easier to manage than two smaller servers.
+
+Advantages:
+Simpler architecture
+Avoids operational overhead of multiple machines
+Easier security, backups, deployments, and debugging
+No distributed system complexity
+Drawbacks
+Vertical scaling always has limits
+No matter how much money you spend, there is a hard limit to how powerful a single machine can become.
+Single point of failure
+If the server goes down, the entire system becomes unavailable.
+No geographic distribution
+
+Example:
+60% users in US, 40% users in India
+If the server is only in the US, Indian users will face higher latency.
+
+Horizontal Scaling (Scaling Out)
+Adding more servers instead of increasing the size of one server.
+Example:
+1 server -> multiple servers
+
+Advantages:
+No hard scaling limit
+Better fault tolerance
+If one server fails, traffic shifts to others
+Supports geographic distribution
+
+Example:
+US users -> US servers
+India users -> India servers
+This reduces latency for global users.
+
+Drawbacks
+1.Requires load balancers
+Need to decide routing strategy:
+Round robin
+Least connections
+IP hash
+Geo-based routing
+
+2. Synchronization problems
+Keeping data consistent across servers becomes difficult.
+
+3. Network failures between servers
+What if servers cannot communicate and start making conflicting decisions?
+This leads to distributed system problems like split-brain scenarios.
+
+4. Failure detection and recovery
+Need mechanisms to:
+detect dead servers
+stop routing traffic to them
+recover and rejoin them safely later
+
+Horizontal scaling solves capacity problems but introduces distributed system complexity.
+
+
+
+✅✅✅✅✅✅✅✅✅✅ Load Balancing Algorithms ✅✅✅✅✅✅✅✅✅✅
+
+Load balancers distribute incoming requests across multiple servers using different routing algorithms.
+
+1. Round Robin
+Requests are sent sequentially to servers.
+
+Example:
+A -> B -> C -> A -> B -> C
+
+Works well when:
+servers have similar hardware
+requests take roughly similar time
+
+Example:
+3 servers
+Each: 4 GB RAM, 2 CPUs
+Simple round robin works fine here.
+
+Problem
+Not all requests are equal.
+
+Example:
+Request 1 = fast
+Request 2 = slow (external API + DB calls)
+
+Traffic:
+1, 2, 2, 1, 2, 2, 1, 2, 2
+Round robin may keep sending heavy requests to the same server, causing uneven load distribution.
+
+2. Weighted Round Robin
+Servers receive traffic proportional to their capacity.
+
+Example:
+A = 8 GB RAM, 2 CPU
+B = 4 GB RAM, 2 CPU
+C = 4 GB RAM, 2 CPU
+
+Traffic distribution:
+A gets 2 requests
+B gets 1 request
+C gets 1 request
+More powerful servers handle more traffic.
+
+3. Least Connections
+Load balancer sends traffic to the server with the fewest active connections.
+
+Best when:
+request durations vary heavily
+some requests are slow/blocking
+Helps avoid one server getting stuck with many long-running requests.
+
+4. IP Hash / URL Hash
+Routing based on:
+client IP
+request URL
+
+Example:
+hash(user_ip) % number_of_servers
+
+Useful for:
+sticky sessions
+cache locality
+routing same users consistently to same server
+
+Problem:
+Uneven distribution can happen if traffic patterns are skewed.
+
+5. Least Response Time (Least Time)
+Routes traffic to the server with:
+lowest response time
+lowest latency
+sometimes combined with least connections
+
+Helps avoid slow or overloaded servers dynamically.
+
+======================== Health Checks ========================
+
+Load balancers continuously monitor server health.
+
+Flow:
+Load balancer periodically sends health-check requests
+If server responds successfully → keep routing traffic
+If server returns errors (like 502) or stops responding:
+mark server unhealthy
+stop sending traffic
+Continue background health checks
+Once server recovers:
+add it back to rotation
+
+Example:
+Healthy -> traffic allowed
+502/timeout -> removed from rotation
+Recovered -> added back
+
+
+✅✅✅✅✅✅✅✅✅✅ CDN (cloudflare) ✅✅✅✅✅✅✅✅✅✅
+
+Suppose the server is there in tokyo and user is seitiing on a plae 20,000 km away from server 
+If we consider the speed as optical fibers that is 200,000km/s in that case user will face 100 ms delay for response there is no other way we can reduce tis time no optimicxations can reduece this 
+
+here cdn comes into picture, we place cdn (pop) in the same locaction 
+Type of content we put into cdn 
+1. static js bundles, css bundles, images , videos  
+2. API resposne: product catalog 
+3. Security: DDOS request first goes to cloudflare instead of servers 
+
+======================== Edge Computing ========================
+
+Edge computing means running code closer to users instead of a centralized server.
+Instead of:
+User -> India -> US server
+
+Requests are processed at nearby edge locations:
+User -> Nearby Edge Server
+
+This reduces:
+latency
+network round trips
+load on origin servers
+
+JWT/session validation can happen at the edge before requests reach the main backend.
+User -> Edge Worker -> Main Backend
+
+If authentication fails:
+request is rejected immediately at edge
+backend resources are saved
+
+Edge machines are usually lightweight compared to full backend servers.
+1 CPU, 1 GB RAM
+
+Problems:
+limited memory
+CPU constraints
+execution time limits
+smaller runtime environments
+
+Because of this, edge computing is best for:
+lightweight computation
+request filtering
+auth validation
+caching
+routing logic
+
+Edge Computing Platforms
+Cloudflare Workers
+Vercel Edge Functions
+
+Example:
+Cloudflare Workers runs code across globally distributed edge locations.
