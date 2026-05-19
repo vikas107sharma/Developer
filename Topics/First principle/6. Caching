@@ -44,8 +44,46 @@ buffer pool
 query cache
 page cache
 
+E. Distributed cache
+Redis 
+
 Why query becomes faster second time?
 Because pages are in memory.
+
+C. Local Caching
+Cache stored inside application memory.
+const cache = new Map();
+
+Easy and extremely fast.
+Problem:
+Each server has its own cache.
+Server A cache != Server B cache
+Cache is also lost after restart/deployment.
+
+D. Distributed Caching (Redis / Memcached)
+Centralized cache shared across all servers.
+App Servers -> Redis -> Database
+
+Common tools:
+Redis
+Memcached
+
+Advantages:
+Shared cache across instances
+Reduces DB load
+Better consistency
+
+Problem:
+Network latency
+Cache invalidation complexity
+Extra infrastructure dependency
+
+Redis is more commonly used because it supports:
+TTL
+Pub/Sub
+Distributed locks
+Persistence
+Advanced data structures
 
 ======================== Cache Patterns ========================
 https://www.youtube.com/shorts/6ilTc2ayWDY
@@ -96,40 +134,16 @@ update DB
 Why?
 Because concurrent readers can repopulate old data.
 
-C. Local Caching
-Cache stored inside application memory.
-const cache = new Map();
+C. Versioning/ CAS (for race condition) 
+Store version/timestamp
+Only update cache if version mismatch 
 
-Easy and extremely fast.
-Problem:
-Each server has its own cache.
-Server A cache != Server B cache
-Cache is also lost after restart/deployment.
+D. Read your write consistency 
+For few seconds force read from master DB
 
-D. Distributed Caching (Redis / Memcached)
-Centralized cache shared across all servers.
-App Servers -> Redis -> Database
-
-Common tools:
-Redis
-Memcached
-
-Advantages:
-Shared cache across instances
-Reduces DB load
-Better consistency
-
-Problem:
-Network latency
-Cache invalidation complexity
-Extra infrastructure dependency
-
-Redis is more commonly used because it supports:
-TTL
-Pub/Sub
-Distributed locks
-Persistence
-Advanced data structures
+E. Cache aside pattern 
+Update DB 
+Delete from cache
 
 ======================== Cache Hit Ratio ========================
 
@@ -146,6 +160,12 @@ Example:
 90 cache hits out of 100 requests = 90% hit ratio
 
 ======================== Cache stampede ========================
+Thundering herd problem 
+Causes when:
+TTL expires 
+Cache is flushed 
+Redis restart
+Hot key gets deleted 
 
 Cache expires.
 1000 requests arrive simultaneously.
@@ -158,18 +178,33 @@ A. Mutex locking
 Only one request rebuilds cache.
 Others wait/retry.
 
-B. Request coalescing
-Merge concurrent requests.
+Request comes -> tries to get lock 
+If got lock:
+    fetch from db
+    set cache
+    release lock 
+else 
+    wait 
+    retry cache
 
-C. Stale-while-revalidate
+B. Stale-while-revalidate
 Serve stale data temporarily.
 Background refresh.
 
-D. Jitter TTL
-all keys expire at 12:00
+C. Jitter TTL
+All keys expire at 12:00
 
 ttl = 300 + random(0, 60)
 Prevents synchronized expiry.
+
+D. Pre-warm cache 
+Before Expiry 
+    Refresh cache proactively 
+Used for:
+    Homepage
+    Trending page 
+    Config 
+    Hot data 
 
 ======================== Hot keys ========================
 
@@ -183,11 +218,45 @@ single Redis node bottleneck
 uneven load
 
 Solutions:
-local in-memory cache
-replication
-key sharding
-request collapsing
+Local Cache (First level cache)
+    server local memory -> redis -> db 
 
+Replicate Hot Key (Key sharding or key splitting)
+    keep the key in multiple shards 
+
+    Instead of:
+        homepage:india
+    Create:
+        homepage:india:1
+        homepage:india:2
+        homepage:india:3
+
+    Read:
+        Pick random key 
+    Write case:
+        Update all of the keys
+
+Use CDN/ Edge Cache 
+For: 
+    Homepage 
+    Trending page 
+    Public data
+Put it in:
+    Cloudflare/ Akami/ Fastly 
+So: 
+    Redis is not hit at all
+
+Logical Expiry + Background Refresh 
+    Instead of letting key expire 
+    One background thread refreshes it 
+So:
+    Redis does not get rebuild storms
+
+Pre-warm & Protect 
+For known hot keys:
+    Never let them expire 
+    Refresh them periodically via job 
+ 
 ======================== Open Questions ========================
 
 Real interview architecture answer
