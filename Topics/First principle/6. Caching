@@ -24,6 +24,11 @@ CPU spikes
 buffer pool churn
 lock contention increases
 
+When to bring cache in the interview ?
+If your system is read heavy (Reduce the load on db)
+To reduce the latency
+Expensive query precompute
+
 ======================== Types of caching ========================
 
 A. Client-side cache
@@ -256,6 +261,19 @@ Pre-warm & Protect
 For known hot keys:
     Never let them expire 
     Refresh them periodically via job 
+
+✅✅✅✅✅✅✅✅✅✅ Redis ✅✅✅✅✅✅✅✅✅✅
+
+Redis is famous for single threaded at least for command execustion. 
+CPUs today have multiple cores then why redis has single thread. 
+Threads aren't free. The coordination between threads: locks, synchronization and context-switching are very expensive. Wastes more CPU cycle than it saves.
+
+How redis handles so many requests in a single thread 
+1. Pure ram 
+2. Tiny operations 
+3. Event loop 
+
+
  
 ======================== Open Questions ========================
 
