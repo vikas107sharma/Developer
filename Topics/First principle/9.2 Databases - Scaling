@@ -1,0 +1,213 @@
+✅✅✅✅✅✅✅✅✅✅ Scaling Relational Databases ✅✅✅✅✅✅✅✅✅✅
+1. Vertical Scaling
+Increase CPU/RAM.
+
+✅ Simple
+❌ Hardware limits
+
+2. Read Replicas
+Primary DB -> Read Replicas (India, US, Europe)
+
+Write queries go to primary DB.
+Read queries are distributed to replicas.
+
+Benefits
+Reduces load on primary DB
+Lower read latency for global users
+Improves read scalability
+
+In most applications:
+~70% of traffic is read-heavy
+So replicas significantly reduce database pressure.
+
+✅ Better read throughput
+❌ Replication lag / eventual consistency
+
+3. Sharding
+Split data across multiple DBs.
+user_id % 4
+
+Problems:
+cross-shard joins
+distributed transactions
+
+======================== How Replication Works ========================
+
+Flow:
+Primary -> WAL/Binlog -> Replica
+Write on primary
+Change written to WAL/Binlog
+Replica reads logs
+Replica replays changes
+
+======================== Replication Modes ========================
+Asynchronous
+Primary does not wait for replica.
+✅ Fast writes
+❌ Possible lag
+
+Semi-Synchronous
+Waits for at least one replica ACK.
+❌ Slower writes
+✅ Better durability
+
+Synchronous
+Waits for all replicas.
+✅ Strong consistency
+❌ High latency
+
+======================== Replication Lag Problem ========================
+Replication is asynchronous in many databases.
+
+Example:
+User updates profile name → write goes to primary DB
+User immediately refreshes profile
+Read request goes to replica
+Replica is delayed by 200ms
+User sees stale data
+
+This is called:
+Replication Lag
+For payments, invoices, balances, or order status, stale reads can create major consistency problems.
+
+======================== Handling Consistency ========================
+1. Read-After-Write Consistency
+After a user performs a write:
+temporarily route related reads to primary DB
+avoid replicas until replication catches up
+
+Example:
+Update profile -> next profile read goes to primary DB
+Very common strategy in production systems.
+
+2. Replication Lag Tracking
+Track replica lag and avoid serving reads from delayed replicas.
+If lag exceeds threshold:
+Replica lag > 500ms -> stop routing reads
+Some systems block reads until replication completes.
+
+Tradeoff:
+better consistency
+higher latency
+
+======================== Sharding ========================
+
+As tables grow to billions of rows, a single database instance becomes difficult to scale.
+orders table -> billions of rows
+
+Problems:
+Slow queries
+Large indexes
+Expensive joins
+Storage limits
+High write pressure
+
+Sharding
+Splitting data across multiple database instances.
+Shard 1 -> Orders 1 to 5 billion
+Shard 2 -> Orders 5 to 10 billion
+
+The biggest challenge:
+How do you decide which data goes to which shard?
+
+This is called:
+shard key selection
+
+Common shard keys:
+user_id
+region
+order_id hash
+
+What Problems Does Sharding Solve?
+1. Query Scalability
+Smaller datasets per shard:
+smaller indexes
+fewer scanned rows
+
+2. Write Scalability
+Writes get distributed across multiple DB instances instead of one primary DB handling everything.
+
+Sharding splits data across multiple databases to distribute load and storage.
+Types of Sharding
+1. Range Based
+1-1000 -> Shard A
+1001-2000 -> Shard B
+
+2. Hash Based
+user_id % 4
+Distributes data more evenly.
+
+3. Directory Based
+A lookup service decides which shard stores the data.
+
+Shard Key
+Column used to decide where data lives.
+user_id
+tenant_id
+region
+
+Query With Shard Key
+Efficient:
+SELECT * FROM orders WHERE user_id = 10
+DB directly knows target shard.
+
+Query Without Shard Key
+Expensive:
+Search all shards
+called:
+Scatter-Gather Query
+
+Modern Distributed Databases
+
+Some databases handle:
+sharding
+replication
+failover
+distributed transactions
+
+Examples:
+PlanetScale
+Neon
+CockroachDB
+
+======================== Hot Shard Problem ========================
+
+One shard receives disproportionately high traffic.
+Celebrity user -> all traffic hits one shard
+
+Problems:
+uneven load
+CPU bottleneck
+storage imbalance
+Fixes
+better shard key
+hashing
+resharding
+consistent hashing
+
+======================== SQL Horizontal Partitioning Tradeoffs ========================
+1. Joins Become Hard
+Cross-shard joins are expensive.
+Query Shard A
+Query Shard B
+Move data across network
+Merge results
+
+This becomes:
+Distributed Join
+not a normal local join anymore.
+
+2. Transactions Become Complex
+ACID across shards is difficult.
+Requires:
+2PC (Two-Phase Commit)
+sagas
+distributed coordination
+
+3. Operational Complexity
+resharding requires data movement
+shard mapping management
+routing logic in application
+
+4. Limited Flexibility
+Changing shard key later is extremely painful.
