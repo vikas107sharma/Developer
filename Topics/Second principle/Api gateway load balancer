@@ -1,0 +1,159 @@
+======================== Load Balancer ========================
+Load Balancer
+Distributes traffic
+It does NOT understand business intent.
+
+Example:
+Real Users -> 10K requests
+Bots -> 50K requests
+
+A normal load balancer may still distribute both equally across servers.
+
+Modern L7 load balancers like Amazon Web Services ALB support:
+path-based routing
+header-based routing
+limited filtering
+
+Example:
+/orders  -> Order Service
+/payments -> Payment Service
+/users -> User Service
+
+This slightly narrows the gap between load balancers and API gateways.
+
+======================== Internal Load Balancer ========================
+Used for:
+East-West traffic
+traffic between internal services.
+
+Example:
+Frontend -> Order Service
+Order Service -> Payment Service
+Benefits
+Internal traffic distribution
+Service scaling
+High availability
+Independent scaling of services
+Better resource utilization
+
+Example:
+Scale Order Service only
+without scaling everything else.
+
+======================== API Gateway ========================
+Governs traffic
+while load balancer mainly:
+Moves traffic
+
+API Gateway Responsibilities
+1. Authentication
+OAuth2
+API Keys
+JWT validation
+identity verification
+
+2. Rate Limiting / Throttling
+Prevents:
+abuse
+bot traffic
+accidental overload
+Example:
+100 requests/minute per user
+
+3. Routing
+path-based routing
+service targeting
+version routing
+
+Example:
+/v1/users (old users)
+/v2/users (new users)
+
+4. Policies & Governance
+input validation
+request transformation
+security rules
+quota management
+Edge Protection
+
+API gateways often sit behind:
+WAF
+CDN
+DDoS protection
+
+They act as:
+First security shield
+against malicious traffic.
+
+======================== When to Use Only Load Balancer ========================
+
+Good enough for:
+internal traffic only
+simple architectures
+early-stage startups
+limited public APIs
+
+======================== When API Gateway is Required ========================
+Use API Gateway when you need:
+
+public APIs
+authentication
+rate limiting
+partner integrations
+centralized governance
+API versioning
+======================== Do NOT Use API Gateway Internally Everywhere ========================
+
+Problems:
+extra latency
+operational overhead
+unnecessary centralization
+
+Better options:
+service mesh
+internal load balancing
+
+======================== API Gateway Drawbacks ========================
+
+If poorly designed:
+Gateway becomes single point of failure
+
+Needs:
+replicas
+clustering
+monitoring
+failover
+
+Typical HA setup:
+Clients
+-> External Load Balancer
+-> Multiple API Gateway Replicas
+-> Backend Services
+
+Monitoring stack commonly includes:
+Prometheus
+Grafana
+Elasticsearch
+Jaeger
+
+======================== Managed vs Self-Hosted API Gateways ========================
+
+Managed gateways:
+easy initially
+low operational effort
+
+Example:
+Amazon API Gateway
+
+Problem:
+Costs become huge at scale
+
+Self-hosted alternatives:
+Kong
+NGINX
+
+Reasons for self-hosting:
+lower cost
+full control
+custom policies
+performance tuning

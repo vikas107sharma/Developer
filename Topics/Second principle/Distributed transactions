@@ -46,6 +46,11 @@ services don't know whether to commit or rollback
 
 
 ✅✅ Saga Pattern ✅✅
+
+SAGA is a sequence of local transactions.
+If one fails, compensating transactions
+undo the previous steps.
+
 Saga avoids distributed locking and 2PC.
 
 Instead of one global transaction:
