@@ -1,5 +1,5 @@
 
-✅✅✅✅✅✅✅✅✅✅ Connection Pooling ✅✅✅✅✅✅✅✅✅✅
+✅✅ Connection Pooling ✅✅
 
 Creating a DB connection is expensive:
 TCP connection setup

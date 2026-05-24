@@ -1,4 +1,4 @@
-✅✅✅✅✅✅✅✅✅✅ Basic ✅✅✅✅✅✅✅✅✅✅
+✅✅ Basic ✅✅
 
 Username and password are sent with every request.
 
@@ -12,7 +12,7 @@ Must use HTTPS, otherwise credentials can be stolen.
 No logout/session management.
 Poor scalability for modern systems/mobile apps.
 
-✅✅✅✅✅✅✅✅✅✅ SESSION ✅✅✅✅✅✅✅✅✅✅
+✅✅ SESSION ✅✅
 
 When the user logs in, the server creates a session ID and sends it to the user. This ID is stored in a cookie and is then passed with all subsequent requests.
 Server stores the session ID in Redis instead of database
@@ -23,7 +23,7 @@ DRAWBACKS:
 3. Redis/session DB failure can break authentication.
 
 
-✅✅✅✅✅✅✅✅✅✅ JWT ✅✅✅✅✅✅✅✅✅✅
+✅✅ JWT ✅✅
 
 Login → User sends username/password once
 Server → Generates JWT token
@@ -93,7 +93,7 @@ Otherwise “logout” is mostly fake from server perspective.
 ? The whole point is if you have to use persistence storage why not use stateful approach in the first place  
 
 
-✅✅✅✅✅✅✅✅✅✅ API KEY AUTHENTICATION ✅✅✅✅✅✅✅✅✅✅
+✅✅ API KEY AUTHENTICATION ✅✅
 
 Client sends a unique API key with every request.
 x-api-key: sk_live_xxxxx
@@ -123,7 +123,7 @@ Rotate keys periodically
 Never expose secret keys in frontend
 
 
-✅✅✅✅✅✅✅✅✅✅ OAUTH 2.0 / OPENID CONNECT (OIDC) ✅✅✅✅✅✅✅✅✅✅
+✅✅ OAUTH 2.0 / OPENID CONNECT (OIDC) ✅✅
 
 What problem it solves:
 1. The more sites you visits the more password you need to remember.
@@ -175,7 +175,7 @@ Google sends authorization code
 Backend exchanges code for tokens
 User logged in
 
-✅✅✅✅✅✅✅✅✅✅ Security Issues ✅✅✅✅✅✅✅✅✅✅
+✅✅ Security Issues ✅✅
 
 1. Do not return friendly error: Username is wrong or Password is incorrect, Always return either username or password is incorrect.
 2. Comparing password is slower due to cpu based encryption: If username is wrong response is faster but if the password is wrong response is slower, using that parameter the delay attacker can know that either username or password is wrong.

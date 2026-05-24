@@ -1,4 +1,4 @@
-✅✅✅✅✅✅✅✅✅✅ Percentiles ✅✅✅✅✅✅✅✅✅✅
+✅✅ Percentiles ✅✅
 
 P95
 95% of requests complete within this response time.
@@ -34,7 +34,7 @@ It helps identify the real bottleneck instead of guessing.
 
 
 
-✅✅✅✅✅✅✅✅✅✅ Scaling ✅✅✅✅✅✅✅✅✅✅
+✅✅ Scaling ✅✅
 Vertical Scaling (Scaling Up)
 Increasing resources of the same server:
 More CPU
@@ -103,7 +103,7 @@ Horizontal scaling solves capacity problems but introduces distributed system co
 
 
 
-✅✅✅✅✅✅✅✅✅✅ Load Balancing Algorithms ✅✅✅✅✅✅✅✅✅✅
+✅✅ Load Balancing Algorithms ✅✅
 
 Load balancers distribute incoming requests across multiple servers using different routing algorithms.
 
@@ -199,7 +199,7 @@ Healthy -> traffic allowed
 Recovered -> added back
 
 
-✅✅✅✅✅✅✅✅✅✅ CDN (cloudflare) ✅✅✅✅✅✅✅✅✅✅
+✅✅ CDN (cloudflare) ✅✅
 
 Suppose the server is there in tokyo and user is seitiing on a plae 20,000 km away from server 
 If we consider the speed as optical fibers that is 200,000km/s in that case user will face 100 ms delay for response there is no other way we can reduce tis time no optimicxations can reduece this 

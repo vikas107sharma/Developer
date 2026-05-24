@@ -1,4 +1,4 @@
-✅✅✅✅✅✅✅✅✅✅ Caching ✅✅✅✅✅✅✅✅✅✅
+✅✅ Caching ✅✅
 
 1. What caching actually is
 
@@ -262,7 +262,7 @@ For known hot keys:
     Never let them expire 
     Refresh them periodically via job 
 
-✅✅✅✅✅✅✅✅✅✅ Redis ✅✅✅✅✅✅✅✅✅✅
+✅✅ Redis ✅✅
 
 Redis is famous for single threaded at least for command execustion. 
 CPUs today have multiple cores then why redis has single thread. 

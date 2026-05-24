@@ -1,0 +1,101 @@
+✅✅ 2-Phase Commit (2PC) ✅✅
+
+Used for distributed transactions where multiple services/databases must either:
+
+Commit together
+OR
+Rollback together
+
+Example:
+Payment Service
+Inventory Service
+Accounting Service
+
+A coordinator manages the transaction.
+
+Phases
+1. Prepare Phase
+Coordinator asks all services:
+"Can you commit?"
+
+Services:
+validate transaction
+acquire locks
+respond YES/NO
+
+2. Commit Phase
+If all respond YES:
+Coordinator -> COMMIT
+
+Otherwise:
+Coordinator -> ROLLBACK
+
+Problems with 2PC
+1. Slowest Service Controls Transaction
+Overall latency depends on the slowest participant.
+
+2. Long-Held Locks
+Locks remain until all services finish.
+This reduces concurrency and hurts scalability.
+
+3. Coordinator Failure Problem
+If coordinator dies:
+participants remain blocked
+locks may never release
+services don't know whether to commit or rollback
+
+
+✅✅ Saga Pattern ✅✅
+Saga avoids distributed locking and 2PC.
+
+Instead of one global transaction:
+each service commits independently
+failures trigger compensating actions
+
+Works on:
+Eventual Consistency
+
+Example
+Normal Flow
+Payment Service -> charge card
+Inventory Service -> reserve stock
+Accounting Service -> create entry
+
+Compensation Flow
+If inventory fails:
+
+Payment Service -> refund
+Accounting -> reverse entry
+
+These are:
+Business-level rollbacks
+
+Saga Types
+1. Choreography
+Services communicate using events.
+No central controller.
+
+2. Orchestration
+Central saga orchestrator controls flow.
+
+Orchestrator Failure vs 2PC Coordinator Failure
+Saga orchestrator usually stores progress in DB/message log.
+
+If it crashes:
+Restart -> continue from saved state
+
+Unlike 2PC:
+no global locks remain stuck
+services are not blocked waiting forever
+
+Problems with Sagas
+Compensation is Messy
+Undoing business actions is difficult.
+
+Examples:
+emails/notifications cannot be undone
+third-party APIs may not support rollback
+refunds must be idempotent
+
+System may temporarily remain inconsistent while compensations run.
+User sees charge before refund completes

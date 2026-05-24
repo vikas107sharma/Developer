@@ -1,4 +1,4 @@
-✅✅✅✅✅✅✅✅✅✅ Middleware ✅✅✅✅✅✅✅✅✅✅
+✅✅ Middleware ✅✅
 
 Sits between request/ response cycle
 
@@ -12,7 +12,7 @@ Request Context (Only limited to that particular request)
 Middleware set some context to given request (userId, Role, Permission)
 
 
-✅✅✅✅✅✅✅✅✅✅ Before request/ After request ✅✅✅✅✅✅✅✅✅✅
+✅✅ Before request/ After request ✅✅
 
 import time
 import logging
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     app.run(port=5000)
 
 
-✅✅✅✅✅✅✅✅✅✅ Decorator ✅✅✅✅✅✅✅✅✅✅
+✅✅ Decorator ✅✅
 
 import time
 import logging

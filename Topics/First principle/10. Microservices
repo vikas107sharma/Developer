@@ -1,5 +1,5 @@
 
-✅✅✅✅✅✅✅✅✅✅ Microservices ✅✅✅✅✅✅✅✅✅✅
+✅✅ Microservices ✅✅
 A monolith keeps all modules inside a single application.
 Orders + Payments + Notifications + Auth
 run and deploy together.
@@ -73,7 +73,7 @@ distributed transaction complexity
 Payment succeeds
 Order update fails
 
-✅✅✅✅✅✅✅✅✅✅ Serverless Architecture ✅✅✅✅✅✅✅✅✅✅
+✅✅ Serverless Architecture ✅✅
 In traditional infrastructure, we manually decide:
 CPU
 RAM
