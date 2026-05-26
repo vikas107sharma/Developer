@@ -12,6 +12,22 @@ Must use HTTPS, otherwise credentials can be stolen.
 No logout/session management.
 Poor scalability for modern systems/mobile apps.
 
+Step 1. Combine username and password
+username:passwod 
+
+Step 2. Encode with Base64
+DxNlcm5hbWU6cfdeeihswokhfgwmQ=
+
+Step 3. Add to the authentication header 
+Authentication: Basic DxNlcm5hbWU6cfdeeihswokhfgwmQ=
+
+Base64 is not encryption!
+Its encoding, 
+Anyone can decode it in seconds
+
+Why use Base64? HTTP header compatibility 
+Not for security 
+
 ✅✅ SESSION ✅✅
 
 When the user logs in, the server creates a session ID and sends it to the user. This ID is stored in a cookie and is then passed with all subsequent requests.
