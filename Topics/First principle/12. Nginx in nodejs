@@ -1,0 +1,461 @@
+```text
+✅✅ Nginx + Node.js Concurrency Model ✅✅
+
+======================== Why Nginx Exists In Front Of Node.js ========================
+
+Node.js can directly serve requests:
+
+Client
+  ↓
+Node.js
+
+But in production:
+
+Client
+  ↓
+Nginx
+  ↓
+Node.js
+
+Nginx provides:
+
+SSL termination
+load balancing
+rate limiting
+static file serving
+connection buffering
+
+Node focuses on:
+
+business logic
+database access
+API handling
+
+======================== Event Loop In Nginx ========================
+
+Each Nginx worker process runs:
+
+Single Thread
+Single Event Loop
+
+Uses OS facilities:
+
+epoll (Linux)
+kqueue (BSD/macOS)
+
+Nginx is event-driven.
+
+Worker does not create one thread per request.
+
+Example:
+
+1000 clients connected
+
+Worker Process
+    ↓
+Event Loop
+    ↓
+Tracks all sockets
+
+Most connections are:
+
+waiting
+idle
+keep-alive
+
+CPU usage remains low.
+
+======================== Event Loop In Node.js ========================
+
+Node.js also uses:
+
+Single Thread
+Single Event Loop
+
+Implemented through:
+
+libuv
+
+Example:
+
+Request
+    ↓
+Node.js
+    ↓
+Database Query
+
+While DB is processing:
+
+Node Event Loop
+    ↓
+Continues serving other requests
+
+Node does not block while waiting for I/O.
+
+======================== What Happens When Nginx Is In Front Of Node ========================
+
+Request flow:
+
+Client
+   ↓
+Nginx Worker Event Loop
+   ↓
+Node.js libuv Event Loop
+   ↓
+Database
+
+Both event loops participate.
+
+Nginx event loop:
+handles network layer
+
+Node event loop:
+handles application layer
+
+======================== Example Request Lifecycle ========================
+
+Client sends request
+
+Step 1:
+
+Nginx Worker receives connection
+
+Client
+   ↓
+Nginx Event Loop
+
+Step 2:
+
+Nginx forwards request
+
+Client
+   ↓
+Nginx
+   ↓
+Node
+
+Step 3:
+
+Node executes logic
+
+Node
+   ↓
+DB Query
+
+Step 4:
+
+DB responds
+
+DB
+   ↓
+Node
+   ↓
+Nginx
+   ↓
+Client
+
+======================== Common Misconception ========================
+
+Suppose:
+
+Nginx Worker:
+1000 concurrent connections
+
+Node:
+100 concurrent requests
+
+Wrong:
+
+1000 × 100
+=
+100,000 requests
+
+This is incorrect.
+
+======================== Why Capacities Do Not Multiply ========================
+
+Think of a restaurant.
+
+Lobby (Nginx):
+1000 people can wait
+
+Kitchen (Node):
+100 orders can be cooked
+
+Can restaurant process:
+
+1000 × 100 customers?
+
+No.
+
+Kitchen is bottleneck.
+
+Real system:
+
+1000 requests
+    ↓
+Nginx
+    ↓
+100 requests in Node
+    ↓
+900 waiting
+
+Throughput depends on slowest component.
+
+======================== Real Capacity Formula ========================
+
+System Throughput ≈
+
+min(
+Nginx Capacity,
+Node Capacity,
+Database Capacity
+)
+
+Example:
+
+Nginx:
+10,000 connections
+
+Node:
+2,000 requests
+
+Database:
+200 queries
+
+Actual bottleneck:
+
+Database
+
+System behaves closer to:
+
+200 concurrent DB operations
+
+======================== Why Node Handles Many Requests ========================
+
+Node is excellent for:
+
+API servers
+webhooks
+external API calls
+database operations
+
+Because most requests are:
+
+waiting for something
+
+Example:
+
+Request
+   ↓
+Waiting for DB
+
+During wait:
+
+Event Loop serves other requests
+
+This creates high concurrency.
+
+======================== Where Node Struggles ========================
+
+CPU-intensive work.
+
+Example:
+
+Generate PDF
+Video processing
+Image resizing
+Large calculations
+
+Bad:
+
+for(i=0; i<1e10; i++)
+{
+   ...
+}
+
+Event loop becomes blocked.
+
+All requests wait.
+
+======================== Solving CPU Work In Node ========================
+
+Options:
+
+Worker Threads
+Cluster
+Separate Worker Services
+
+Example:
+
+HTTP API
+    ↓
+Queue
+    ↓
+Worker Process
+
+Keeps API responsive.
+
+======================== What PM2 Cluster Actually Does ========================
+
+Node process uses:
+
+One CPU Core
+
+Server:
+
+8 CPU Cores
+
+Without Cluster:
+
+Core 1 → Used
+Core 2 → Idle
+Core 3 → Idle
+...
+
+With PM2:
+
+pm2 start app.js -i max
+
+Creates:
+
+Node Process 1
+Node Process 2
+Node Process 3
+...
+Node Process 8
+
+Now all cores are used.
+
+======================== How Go Is Different ========================
+
+Node:
+
+One Event Loop
+
+Needs:
+
+Cluster
+Worker Threads
+
+for CPU scaling.
+
+Go:
+
+Many Goroutines
+Few OS Threads
+
+Example:
+
+100,000 Goroutines
+        ↓
+Go Scheduler
+        ↓
+8 CPU Cores
+
+Runtime automatically utilizes all cores.
+
+No PM2 needed.
+
+======================== Node vs Go Concurrency ========================
+
+Node:
+
+Request
+   ↓
+Event Loop
+   ↓
+Async I/O
+
+Best for:
+
+I/O-bound workloads
+
+Examples:
+
+DB queries
+REST APIs
+Shopify integrations
+Webhooks
+
+Go:
+
+Request
+   ↓
+Goroutine
+   ↓
+Scheduler
+
+Excellent for:
+
+I/O workloads
+CPU workloads
+
+======================== Modern Production Deployment ========================
+
+Traditional:
+
+Internet
+    ↓
+Nginx
+    ↓
+Node.js
+    ↓
+MySQL
+
+Modern Cloud:
+
+Internet
+    ↓
+Cloudflare
+    ↓
+AWS ALB
+    ↓
+Node.js
+    ↓
+RDS
+
+Nginx often replaced by:
+
+ALB
+Ingress Controllers
+Envoy
+HAProxy
+
+======================== Key Takeaways ========================
+
+Nginx and Node both have event loops.
+
+Request passes through:
+
+Nginx Event Loop
+        ↓
+Node libuv Event Loop
+        ↓
+Database
+
+Concurrency does not multiply.
+
+Capacity is limited by:
+
+slowest layer
+
+Node is extremely good for:
+
+I/O-bound workloads
+
+Node struggles with:
+
+CPU-bound workloads
+
+Go handles CPU concurrency more naturally.
+
+Real bottleneck in most systems is:
+
+Database
+External APIs
+Network latency
+
+Not Nginx.
+Not Node.
+```
