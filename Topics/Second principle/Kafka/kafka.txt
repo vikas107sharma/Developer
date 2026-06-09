@@ -11,6 +11,7 @@ Cons
 Service crash -> jobs lost
 No retries/durability
 Hard to scale across machines
+
 ======================== Database-Based Async (Polling) ========================
 
 Store tasks in DB.
@@ -23,6 +24,7 @@ Easy retries
 Cons
 Constant polling is inefficient
 High DB load
+
 ======================== Cron Jobs / Scheduled Workers ========================
 
 Run tasks at fixed intervals.
@@ -30,10 +32,10 @@ Run tasks at fixed intervals.
 Cron -> every 5 mins
 
 Use cases:
-
 daily reports
 reminder emails
 cleanup jobs
+
 Pros
 Predictable
 Simple
@@ -42,15 +44,15 @@ Not real-time
 Bad for user-triggered events
 
 Cron is:
-
 Time-driven, not event-driven
+
 ======================== Webhooks ========================
 
-Your system asynchronously calls another system’s API.
+Your system asynchronously calls another system's API.
 
 Example:
-
 Payment success -> call merchant webhook
+
 Pros
 Real-time integration
 Event-driven
@@ -66,10 +68,10 @@ Webhooks are async but unreliable without retries/idempotency.
 Managed async execution.
 
 Examples:
-
 AWS Lambda
 Google Cloud Tasks
 Microsoft Azure Functions
+
 Pros
 Auto scaling
 No server management
@@ -77,18 +79,18 @@ Cons
 Cold starts
 Execution limits
 Stateless nature
+
 ======================== Message Queue ========================
 Producer -> Queue -> Consumer
 
 Used for:
-
 background jobs
 retries
 buffering traffic spikes
 
 Example:
-
 Order placed -> send email job
+
 ======================== Event Streaming ========================
 
 Events are published and multiple consumers react independently.
@@ -104,15 +106,14 @@ One consumer processes it
 Message removed after processing
 
 Example:
-
 Send email
 Generate invoice
 Resize image
 
 Good for:
-
 task processing
 worker systems
+
 Event Streaming (Immutable History)
 Event = fact
 Events are immutable
@@ -120,13 +121,11 @@ Multiple consumers can read same event
 Events can be replayed
 
 Example:
-
 OrderPlaced
 PaymentCompleted
 UserSignedUp
 
 Good for:
-
 analytics
 auditing
 real-time pipelines
@@ -134,387 +133,431 @@ real-time pipelines
 Events stay for retention period even after consumption.
 
 Example:
-
 Apache Kafka
+
 ======================== Is Kafka a Message Queue or Event Stream? ========================
 
 Kafka is fundamentally:
-
 Event Streaming Platform
 
 But it can also behave like a message queue depending on consumption pattern.
 
+
 ✅✅ Kafka ✅✅
-
-What is kafka ?
-
-======================== Topics ========================
-
-WHere is the events stores:
-Broakers and partition
-Broaker is also act as server (a simple machine) 
-
-As kafka as a system it contains myltiple broae=kers
-
-Where do we store data inside the broaker? 
-topic or partition -> partition 
-
-When we talk about data, it is logical partitioning of data (not physical)
-A broaker can containes lot of data even from different topics as well 
-
-Topic is logical thing 
-Inside the broaker we have the partitions which kept the events 
-
-
-To avoid single points of failure we have replicas of broaker 
-but what about the partitions 
-for partitions also kafka internally manages rep;icas (replication_factor)
-
-======================== partitions ========================
-Perform hashing and then you can assign the particular partition to the event 
-Ordering is maintained in a particular partition but not acreoss the partitions 
-
-Consumer can read from multiple partitions but in case of  consumer groups
-Only one of the consumer from the consumer group can read from partition 
-
-partition P
-Consumer group 1 C1a 
-c1 c2 -> only c1 can read from p
-
-Consumer group 2 C2a 
-c3 c4 -> only c3 can read from p 
-
-Multiple consumers can read from the same partition simultaneously, provided they belong to different consumer groups. Within a single consumer group, a partition can be assigned to at most one consumer.
-
-Multiple consumers can read from the same partition simultaneously, provided they belong to different consumer groups. Within a single consumer group, a partition can be assigned to at most one consumer.
-
-Example 
-CG1 (c1, c2)
-Topic (p1, p2, p3)
-
-Correct
-c1 -> p1, p2 
-c2 -> p3 
-
-wrong because c1 and c2 belongs to same consumer group 
-Correct
-c1 -> p1, p2 
-c2 -> p2, p3 
-
-Inside kafka Consumer cannot exist without consumer groups 
-
-what is need of partitions?
-But why partition also
-Broaker can directly see the topic of message and sends it 
-
-A topic is not storage 
-A topic is just a physical storage 
-Kafka needs physical storage and that's what partitions are 
-
-Topic: folder name 
-Partitions: actual files inside it 
-You cannot write data into the folder, you can write data into the files 
-
-Why a single log (topic without partitions) doesn't work
-Imagine Kafka had:
-(Code
-Topic: orders
-(single log file)
-...
-Problems:
-X No scalability
-Only one broker can write
-Throughput capped by one disk/ane CPU
-X No parallelism
-Only one consumer can read efficiently
-Cannot scale consumers
-X No fault tolerance
-If broker dies topic gone
-Kafka's goal was:
-Massive throughput + horizontal scaling
-That is impossible without partitions.
-
-What partitions actually solve
-Scalability
-Each partition:
-⚫is an independent log
-⚫can live on a different broker
-So Kafka scales by:
-Code
-More partitions more parallelism
-more throughput
-Parallel consumers
-If topic has 5 partitions:
-up to 5 consumers can read in parallel (per consumer group)
-Without partitions:
-only one consumer would be useful
-Fault tolerance
-Partitions can be replicated across brokers.
-Topic-level replication is meaningless.
-Replication only makes sense at partition level.
-
-
-Leader follower model 
-Replication factor = 2
-Partition 0:
-Leader Broker 1
-Follower → Broker 2
-Partition 1:
-Leader Broker 2
-Follower Broker 3
-Partition 2:
-Leader Broker 3
-Follower Broker 1
-Only leader handles reads/writes
-Followers:
-replicate data
-take over if leader fails
 
 ======================== Broker ========================
 
-What is a Broker?
 A broker is a Kafka server that stores data and serves read/write requests.
 Think of a broker as:
 a machine
 running Kafka
 storing partitions on disk
-Plain text
+
 Kafka Cluster
 Broker 1
 Broker 2
 Broker 3
-One Kafka multiple brokers = cluster
-Kafka scales by adding brokers
 
-======================== Offset commits ========================
+One Kafka with multiple brokers = cluster.
+Kafka scales by adding brokers.
 
-1 Auto Commit
-Kafka commits periodically
-Easy but risky
-Problem
-Crash after commit message loss
-2 Manual Commit (Recommended)
-Commit after successful processing
+To avoid single points of failure we have replicas of brokers, and partitions are also replicated internally (replication_factor).
+
+======================== Topics ========================
+
+Where are events stored?
+Inside brokers, in partitions.
+
+As Kafka as a system contains multiple brokers, data is stored inside brokers — specifically in partitions.
+
+A topic is a logical thing, not physical.
+A broker can contain a lot of data, even from different topics.
+
+Inside the broker, partitions are what actually hold the events.
+
+Topic: folder name
+Partitions: actual files inside it
+You cannot write data into the folder — you write data into the files.
+
+======================== Partitions ========================
+
+Perform hashing, then assign the event to a specific partition.
+Ordering is maintained within a partition, but not across partitions.
+
+A topic is not physical storage — it is a logical grouping.
+Kafka needs physical storage, and that is what partitions are.
+
+Why a single log (topic without partitions) doesn't work
+Imagine Kafka had:
+Topic: orders
+(single log file)
+
+Problems:
+X No scalability
+Only one broker can write
+Throughput capped by one disk and one CPU
+X No parallelism
+Only one consumer can read efficiently
+Cannot scale consumers
+X No fault tolerance
+If broker dies, topic gone
+
+Kafka's goal was:
+Massive throughput + horizontal scaling
+That is impossible without partitions.
+
+What partitions actually solve
+1. Scalability
+Each partition:
+⚫ is an independent log
+⚫ can live on a different broker
+So Kafka scales by:
+More partitions -> more parallelism -> more throughput
+
+2. Parallel consumers
+If a topic has 5 partitions:
+up to 5 consumers can read in parallel (per consumer group)
+Without partitions, only one consumer would be useful.
+
+3. Fault tolerance
+Partitions can be replicated across brokers.
+Topic-level replication is meaningless — replication only makes sense at the partition level.
+
+======================== Consumer Groups & Partition Assignment ========================
+
+Consumers can read from multiple partitions, but within a single consumer group, only one consumer can read from a given partition.
+
+Partition P
+Consumer group 1 (c1, c2) -> only c1 can read from P
+Consumer group 2 (c3, c4) -> only c3 can read from P
+
+Multiple consumers can read from the same partition simultaneously, provided they belong to different consumer groups. Within a single consumer group, a partition can be assigned to at most one consumer.
+
+Example
+CG1 (c1, c2)
+Topic (p1, p2, p3)
+
+Correct
+c1 -> p1, p2
+c2 -> p3
+
+Wrong (p2 assigned to both c1 and c2 in the same group)
+c1 -> p1, p2
+c2 -> p2, p3
+
+Inside Kafka, a consumer cannot exist without a consumer group.
+
+======================== Leader-Follower Replication ========================
+
+Replication factor = 2
+Partition 0:
+Leader -> Broker 1
+Follower -> Broker 2
+Partition 1:
+Leader -> Broker 2
+Follower -> Broker 3
+Partition 2:
+Leader -> Broker 3
+Follower -> Broker 1
+
+Only the leader handles reads/writes.
+Followers:
+replicate data
+take over if leader fails
+
+======================== Offset Commits ========================
+
+1. Auto Commit
+Kafka commits periodically.
+Easy but risky.
+Problem:
+Crash after commit -> message loss
+
+2. Manual Commit (Recommended)
+Commit after successful processing.
 Types:
 Synchronous
 Asynchronous
+
 Best practice:
-sql
 process message
 commit offset
 
-Delivery Guarantees
-Guarantee
-How
-At-most-once
-Commit before processing
-At least once (Default to kafka)
-Commit after processing
-Exactly-once
-Kafka transactions + idempotent producers
+======================== Delivery Guarantees ========================
 
-How do consumers know an event has arrived?
+Guarantee         | How
+At-most-once      | Commit before processing
+At-least-once     | Commit after processing (Kafka default)
+Exactly-once      | Kafka transactions + idempotent producers
+
+======================== How Do Consumers Know an Event Has Arrived? ========================
+
 X Kafka does NOT push events
-Consumers poll
-Kafka follows pull-based consumption
-Key point
-Consumer doesn't get notified.
+Consumers poll.
+Kafka follows pull-based consumption.
+
+Key point: the consumer doesn't get notified.
 Instead:
 Consumer polls periodically
-If no data → broker waits (long poll)
-If data arrives → broker responds immediately
+If no data -> broker waits (long poll)
+If data arrives -> broker responds immediately
+
 This is called long polling.
 
+======================== Offsets ========================
+
 Does every event have an offset? Who assigns it?
-Yes
-every event has an offset
-But with an important scope:
-Offset is unique only within a partition
+
+Yes — every event has an offset.
+Scope: offset is unique only within a partition.
+
 Who assigns the offset?
-Kafka broker (leader of the partition)
+The Kafka broker (leader of the partition).
+
 How?
-. Producer sends a batch to partition leader
-. Broker appends records to the log
+Producer sends a batch to the partition leader
+Broker appends records to the log
 Broker assigns offsets sequentially
-Topic: Orders
-__consumer_offsets
-Partition PO (Leader Broker 81)
+
+Example:
+Topic: Orders, Partition P0 (Leader Broker 1)
 Log:
-Offset |
-Event
-Order Created(101)
-1
-Order Created(102)
-2 | OrderCancelled(101)
+Offset | Event
+0      | OrderCreated(101)
+1      | OrderCreated(102)
+2      | OrderCancelled(101)
+
 Producers do NOT control offsets.
 Offsets are purely a broker responsibility.
-:
 
+======================== __consumer_offsets ========================
 
-What exactly is stored in __consumer_offsets?
-Each record in consumer_offsets contains:
-(groupId, topic, partition) committedOffset
+Each record in __consumer_offsets contains:
+(groupId, topic, partition) -> committedOffset
+
 Group: payment-service
 Topic: orders
 Partition: 0
 Committed Offset: 125
-Think of it as a map:
-(payment-service, orders, P0)
-(payment-service, orders, P1) +
-88
 
-Why is Kafka so good at handling massive writes?
-1 Append-only log
+Think of it as a map:
+(payment-service, orders, P0) -> 125
+(payment-service, orders, P1) -> 88
+
+======================== Why Kafka Is So Fast at Writes ========================
+
+1. Append-only log
 No random writes
 Always append at end
 Sequential disk writes (FAST)
-3 Batching
-Producers send batches, not single messages:
-Fewer syscalls
-Better compression
-Higher throughput
-5 Minimal broker logic
-Kafka broker does NOT:
-Deserialize messages
-Apply business logic
-Filter per consumer
-Just:
-00
-append serve + replicate
-2 OS Page Cache
+
+2. OS Page Cache
 Kafka relies on OS cache
 Writes hit memory first
 Disk flush happens asynchronously
 Zero-copy optimizations.
-4 Partitioning
+
+3. Batching
+Producers send batches, not single messages:
+Fewer syscalls
+Better compression
+Higher throughput
+
+4. Partitioning
 Writes are spread across:
 Partitions
 Brokers
 Disks
 
-How does Kafka handle so many reads?
-Same reasons as writes
+5. Minimal broker logic
+Kafka broker does NOT:
+Deserialize messages
+Apply business logic
+Filter per consumer
+Just: append + serve + replicate
+
+======================== How Kafka Handles So Many Reads ========================
+
+Same reasons as writes:
 Sequential disk reads
 Page cache
 No message deletion per read
 Consumers read independently
-1000 consumers reading same data?
+
+1000 consumers reading the same data?
 Disk read once, memory read many times.
 
-======================== Pubsub vs Kafka ========================
+======================== Pub-Sub vs Kafka ========================
 
-Kakfa: 
-
-Pubsub: 
-push based model
-each subscribers gets their own copy 
-message will stay till it is not pushed to subscriber after that it will be removed 
-It will be difficult to handle when subscriber is slow and producer is fast 
+Pub-Sub:
+push-based model
+each subscriber gets their own copy
+message stays until pushed to subscriber, then removed
+Hard to handle when subscriber is slow and producer is fast
 
 Delivery Model
-Aspect
-Pub-Sub
-Kafka
-Delivery
-Retry
-Push
-Pull
-Broker-driven
-Consumer-driven
-Backpressure
-Hard
-Natural
-Kafka consumers pull when ready built-in backpressure.
+Aspect          | Pub-Sub         | Kafka
+Delivery        | Push            | Pull
+Retry           | Broker-driven   | Consumer-driven
+Backpressure    | Hard            | Natural
+
+Kafka consumers pull when ready -> built-in backpressure.
+
 Fan-out (Multiple Consumers)
-Pub-Sub
+Pub-Sub:
 Broker duplicates messages
 Memory + network heavy
-Kafka
+Kafka:
 One copy stored
 Many consumers read same data
 Zero duplication
+
 Kafka scales reads cheaply.
-2 Message Lifetime
-Aspect
-Message retention
-Replay
-Late joiner
+
+Message Lifetime
+Aspect              | Pub-Sub         | Kafka
+Message retention   | Until delivered | Time / size based
+Replay              | No              | Yes
+Late joiner         | Misses data     | Can replay
+
 Consumer Independence
-In Pub-Sub:
-Broker tracks delivery
-Pub-Sub
-Kafka
-Until delivered
-Time / size based
-X
-Misses data
-Can replay
+In Pub-Sub: broker tracks delivery.
+In Kafka: consumers track their own offsets.
 
 Throughput
 Kafka is insanely fast because:
-.
 Sequential disk writes
 OS page cache
 Zero-copy (sendfile)
 Batching
 No per-message ACK to multiple consumers
-Pub-Sub systems typically.
+
+Pub-Sub systems typically:
 Do per-message routing
 Maintain subscriber lists
 Push data eagerly
 
-Why Kafka Is Not Just Pub-Sub?
+Why Kafka Is Not Just Pub-Sub
 Kafka intentionally breaks classic pub-sub assumptions:
 Broker does NOT track per-consumer delivery
-.
 Broker does NOT delete data on consumption
 Consumers are responsible for state
 Storage is first-class
+
 Kafka is closer to:
 A distributed commit log + pub-sub semantics
 
-When to Use Kafka & when to use Pub-Sub?
-Use Pub-Sub when:
+When to Use Pub-Sub
 Simple notifications
 Low latency push
 No need for replay
 Few consumers
 
+======================== Kafka vs RabbitMQ ========================
 
-========================   Kafka  vs RabitMQ========================
+Kafka keeps events (event streams).
+RabbitMQ works on tasks (message queue).
 
-Kafka keeps on events (event streams )
-RabitMQ works on tasks (Message queue)
+Kafka                          | RabbitMQ
+Multiple consumers             | Single consumer per task
+Pull-based (consumer polls)    | Push-based
+Time-based retention           | Removed once task ACKed
 
-kafak                   RabitMQ
-Multiple consumers      There can be only one consumer 
-consumer gets mesage by polling (pull based )        push based
-retaintion period       once task is completed it is removed from the queue 
+Feature         | Kafka       | RabbitMQ
+Model           | Event log   | Message broker
+Push vs Pull    | Pull        | Push
+Replay          | Yes         | No
+Retention       | Time-based  | Until ACK
+Throughput      | Very high   | Moderate
+Scaling         | Horizontal  | Limited
+Consumer State  | Consumer    | Broker
+Best For        | Streaming   | Tasks
 
-Feature
-Kafka
-Model
-Event log
-RabbitMQ
-Message broker
-Push vs Pull
-Pull
-Push
-Replay
-Yes
-No
-Retention
-Time-based
-Until ACK
-Throughput
-Very high
-Moderate
-Scaling
-Horizontal
-Limited
-Consumer State
-Consumer
-Broker
-Best For
-Streaming
-Tasks
+
+======================== Work queue vs Pub sub ========================
+
+Work queue: Point to point (each message to one consumer)
+
+resize-image, charge-card, send-email 
+worker1, worker2, worker3
+
+3 worker 3 messages 1:1
+
+Pub-Sub: topic fan-out (each subscriber gets its own copy)
+
+publisher: event (order placed): Topic (order placed)
+inventory email analytics
+1 event 3 copies fan out
+
+======================== Delivery Gurantee ========================
+
+At most once: Fire and forget. Drops are acceptable 
+
+At least once: Retry untill acknowledged. duplicates possible 
+
+Exactly once: Promised by marketing. lock closely
+
+exactly once deliverable across a network is not achievable in general 
+
+neither in Kafka, Rabitmq, SQS.. 
+
+closely related to theproblem Two Generals Problem - a classical imposibility result 
+The acknowledgement problem:
+Producer sends the message the broaker sends back the acknowledgement, the acknowledgement lost in the path 
+Producer is confused:
+Option1: retry  may be cause a duplicate 
+option2: Drop the  message: Give up may be lose it 
+
+
+What exactly once means: at least once + idempotency processing 
+
+
+One bad message freezes everything 
+One poison message which is retrying from infinity. can take down a pipeline handling millions of good messages a minute 
+Effect: Dead letter queue, A DLQ withoud replay path is graveward 
+
+
+Its 3:45 and 
+The broaker is out of memory not because of bug but because producer is producing way faster than consumer 
+
+Producer(10k) messages -> Consumer(2k) diff = 8k which piles up with time 
+
+1. Nothing broke the messages got processed 3 hours later (the answer arrives 3 hrs late is simply no answer)
+2. Backpressure:
+    i: Cap the queue size (Bounded queues): once the queue reached hard cap, Raises error QUEFULFILLEXCEPTION to producer
+    ii: Auto scale the consumers 
+    iii: Credit based flow control, the consumer tells producer how many messages it needs
+
+
+======================== Kafka RabitMQ and SQS ========================
+
+Kafka: log
+RabitMQ: broaker
+SQS: Managed Queue 
+
++
+RabbitMQ - the one with the routing
+INCOMING ROUTING KEY orders.eu.priority
+TOPIC EXCHANGE
+BINDING
+MATCHED
+orders.*.priority
+BINDING
+MATCHED
+orders.eu.*
+BINDING
+orders.#
+MATCHED
+
+Reach the RabitMQ when the routin is the interesting part 
+Background Jobs, Worklows, pre-massage control 
+RabitMQ: consumed message is gone 
+consumedA acknowledged message is gone
+consumeB reaches: sees empty messages queue
+
+In Kafka consumed message = still there 
+Each consumer has its own pointer from where it can start 
+
+Kafka: Replay History 
+RabitMQ: Rich routing 
+SQS: On aws want zero ops  
