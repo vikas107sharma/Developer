@@ -1,0 +1,108 @@
+======================== WebSockets ========================
+
+WebSockets create a persistent full-duplex connection between client and server.
+
+Client <=====> Server
+
+Both sides can send data anytime.
+
+Advantages
+Real-time communication
+Very low latency
+No repeated HTTP requests
+
+Use cases:
+
+Chat applications
+Live trading
+Multiplayer games
+Live notifications
+Scaling Challenges
+
+WebSockets are stateful.
+
+Example:
+
+User connected to Server A
+
+Future messages must reach Server A.
+
+When multiple servers exist:
+
+Client -> Load Balancer -> Server A
+
+Now servers need:
+
+sticky sessions
+shared state (Redis Pub/Sub)
+connection tracking
+
+This makes horizontal scaling harder.
+
+======================== Short Polling ========================
+
+Client requests data at fixed intervals.
+
+Every 5 sec -> GET /updates
+Advantages
+Very simple
+Easy to scale
+Stateless
+
+Each request is independent and can go to any server.
+
+Drawbacks
+Many unnecessary requests
+Higher latency between updates
+
+======================== Long Polling ========================
+
+Client sends request.
+
+Server keeps request open until:
+new data arrives
+timeout occurs
+
+Client -> Request
+Server -> Wait
+Server -> Respond when update arrives
+
+Client immediately opens another request.
+
+Advantages
+Fewer requests than polling
+Near real-time
+
+Drawbacks
+Open connections consume resources
+Harder to scale than short polling
+
+======================== Server-Sent Events (SSE) ========================
+
+Persistent one-way connection from server to client.
+
+Server -----> Client
+
+Client cannot send messages through the same connection.
+
+Advantages
+Simpler than WebSockets
+Built on HTTP
+Auto reconnection support
+Good for live updates
+
+Use cases:
+Stock prices
+Notifications
+Live dashboards
+Progress updates
+Drawbacks
+One-way communication only
+Less flexible than WebSockets
+
+======================== Quick Comparison ========================
+Method	Direction	Scaling
+Short Polling	Request/Response	Easy
+Long Polling	Request/Response (held open)	Medium
+SSE	Server → Client	Easier than WebSockets
+WebSockets	Full Duplex	Hardest
