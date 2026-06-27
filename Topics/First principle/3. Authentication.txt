@@ -196,3 +196,33 @@ User logged in
 1. Do not return friendly error: Username is wrong or Password is incorrect, Always return either username or password is incorrect.
 2. Comparing password is slower due to cpu based encryption: If username is wrong response is faster but if the password is wrong response is slower, using that parameter the delay attacker can know that either username or password is wrong.
 You must take measures to equalize the response time.
+
+
+Technical Reference: Password Salting & Verification
+
+1. Why Same Passwords Have Different Hashes
+Every time a password is saved, modern hashing algorithms (like bcrypt or argon2) generate a cryptographically secure, random 22-character salt.
+
+User A: "admin123" + Salt_A ---> Hash_A
+User B: "admin123" + Salt_B ---> Hash_B
+
+Even though the plaintext inputs are identical, the unique salts ensure that the final output hashes in the database are completely distinct. This completely eliminates rainbow table (precomputed) attacks.
+
+2. How the Salt is Stored (The Anatomy of a Hash)
+The salt is not stored in a separate database column. It is encoded directly into the final hash string stored in your password column.
+
+When looking at a standard bcrypt string:
+$2b$12$R9h/cIPz0gi.URNZX3vOp.1W3exwK3d6BMXW2w56G1Q1s3i.T9mbi
+
+$2b$                  ---> Algorithm identifier
+$12$                  ---> Cost factor (work factor / iterations)
+R9h/cIPz0gi.URNZX3vOp. ---> The Salt (The exact 22 characters)
+1W3exwK3d6BMXW2w56G1Q1s... ---> The actual hashed password payload
+
+3. Step-by-Step Verification Flow (How it Compares)
+When a user attempts to log in with a plaintext password, the backend does not hash it immediately. It follows this strict sequence:
+
+1. Fetch by Identifier: The application queries the database using the username/email to fetch that specific user's stored hash string.
+2. Extract the Salt: The crypto library parsing engine reads the stored hash string and clips out the first 22 characters following the cost factor metadata.
+3. Re-Hash with Extracted Salt: The library takes the incoming plaintext password from the frontend and hashes it using the exact salt it just clipped from the database.
+4. Constant-Time Comparison: The library compares the newly generated hash against the hash payload stored in the database. If they match, the password is correct.
