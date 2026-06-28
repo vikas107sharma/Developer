@@ -1,0 +1,7 @@
+1. If user has entered wrong password then from backend what error message you send and what message the user will see 
+
+2. If two users has same password will the hash you store in db be same ? If not why and how the hash will be stored and matched since same  password has different db (what is the role of salting) 
+    why bcrypt is intentionally slow ?
+
+3. Suppose a hacker has some sets of username and passwords, now he tried those combinations and after trying those email and passwords he figure it out that and find out some set of username that are correct and only password is wrong (means he has found some correct username ) -> time attack   
+

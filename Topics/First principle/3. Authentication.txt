@@ -226,3 +226,17 @@ When a user attempts to log in with a plaintext password, the backend does not h
 2. Extract the Salt: The crypto library parsing engine reads the stored hash string and clips out the first 22 characters following the cost factor metadata.
 3. Re-Hash with Extracted Salt: The library takes the incoming plaintext password from the frontend and hashes it using the exact salt it just clipped from the database.
 4. Constant-Time Comparison: The library compares the newly generated hash against the hash payload stored in the database. If they match, the password is correct.
+
+
+Salt is stored along with the hash in the database and is not meant to be secret. If an attacker steals the database, they obtain both the salt and the hash, allowing them to perform offline brute-force attacks. To add another layer of protection, a secret value called a **pepper** is appended before hashing. Unlike the salt, the pepper is never stored in the database—it is kept in environment variables or a secret manager.
+
+
+bcrypt
+bcrypt is intentionally slow.
+
+Example:
+SHA-256    → ~1 billion hashes/sec (GPU)
+bcrypt     → ~100–1000 hashes/sec
+
+Now every password guess is expensive.
+Attacker's brute force becomes thousands or millions of times slower.
