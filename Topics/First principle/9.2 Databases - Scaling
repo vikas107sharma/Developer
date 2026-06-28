@@ -199,6 +199,7 @@ not a normal local join anymore.
 
 2. Transactions Become Complex
 ACID across shards is difficult.
+Maintain consistency across shards is difficult (Alice is present in shard A and Bob is present in shard B, alice sent 500 to bob)
 Requires:
 2PC (Two-Phase Commit)
 sagas
