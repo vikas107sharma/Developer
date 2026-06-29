@@ -1,0 +1,216 @@
+
+# ======================== CQRS ========================
+Your reads are 100x heavier than your writes, How would you design it ?
+Before saying "increase the read replicas", ask if the read and writes are of the same shape, then this might not be the best answer the answer to this is CQRS (Command Query Responsibility Segregation)
+
+Without CQRS
+
+Suppose you're building an e-commerce application.
+
+Your database looks like this:
+
+Users
+Orders
+OrderItems
+Products
+Payments
+Addresses
+Coupons
+
+When someone opens Order History, your query might be:
+
+SELECT ...
+FROM orders
+JOIN users
+JOIN order_items
+JOIN products
+JOIN payments
+JOIN addresses
+JOIN coupons
+...
+
+That's a heavy query.
+
+Now imagine 10 million users are viewing their order history.
+
+Every request executes those joins.
+
+With CQRS
+
+The write side stays exactly the same.
+
+Orders
+OrderItems
+Products
+Payments
+
+Whenever an order changes:
+
+Create Order
+      │
+      ▼
+Write Database
+
+Instead of making every reader perform joins, you prepare a read model.
+
+Order Summary
+
+orderId
+customerName
+total
+status
+productNames
+estimatedDelivery
+
+This table is already denormalized.
+
+Now your query becomes:
+
+SELECT *
+FROM order_summary
+WHERE orderId = ?
+
+No joins.
+
+No aggregations.
+
+No calculations.
+
+The expensive work was done once, when the order changed—not every time someone views it.
+
+
+Complete example 
+Step 1: User creates an order
+
+The write database stores normalized data.
+
+Orders
+--------
+id = 101
+userId = 5
+status = PAID
+
+OrderItems
+-----------
+orderId = 101
+productId = 7
+productId = 12
+
+Products
+---------
+7 -> iPhone
+12 -> Charger
+
+Users
+------
+5 -> Vikas
+
+Everything is stored correctly.
+
+Step 2: Publish an event
+
+After saving the order:
+
+await Order.create(...);
+
+eventBus.publish({
+    type: "OrderCreated",
+    orderId: 101
+});
+
+Instead of saying:
+
+"Update order_summary"
+
+you say:
+
+"An order was created."
+
+Anyone interested can react.
+
+Step 3: Event handler updates the read model
+
+Another service (or another part of your app) listens:
+
+eventBus.on("OrderCreated", async (event) => {
+
+    const order = await Order.findById(event.orderId)
+        .populate("user")
+        .populate("items.product");
+
+    await OrderSummary.create({
+        orderId: order.id,
+        customerName: order.user.name,
+        total: order.total,
+        products: order.items.map(i => i.product.name),
+        status: order.status
+    });
+
+});
+
+Now your read table contains
+
+OrderSummary
+
+orderId    customerName    total    products
+------------------------------------------------
+101        Vikas           1200     iPhone, Charger
+
+Notice there are no joins when reading anymore.
+
+Reading becomes simple
+
+Instead of
+
+Orders
+JOIN Users
+JOIN Products
+JOIN OrderItems
+JOIN Payments
+JOIN Coupons
+
+you do
+
+SELECT *
+FROM order_summary
+WHERE orderId = 101;
+
+Very fast.
+
+What if the order changes?
+
+Suppose
+
+PAID
+↓
+
+SHIPPED
+
+The write side updates:
+
+await Order.update(...);
+
+eventBus.publish({
+    type: "OrderShipped",
+    orderId: 101
+});
+
+Listener:
+
+eventBus.on("OrderShipped", async (event) => {
+
+    await OrderSummary.updateOne(
+        { orderId: event.orderId },
+        { status: "SHIPPED" }
+    );
+
+});
+
+Now
+
+OrderSummary
+
+101
+Status = SHIPPED
+
+is updated automatically.

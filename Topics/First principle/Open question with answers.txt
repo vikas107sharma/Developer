@@ -1,0 +1,193 @@
+✅✅ Open Questions ✅✅
+
+======================== How to upload a 1 GB file on S3 ========================
+
+Steps:
+1. Backend creates a CreateMultipartUpload and divides the file into chunks (say it comes out to 21), then returns 21 presigned URLs to the frontend.
+2. Frontend uploads to those URLs with retries — e.g. if the 5th chunk fails, it retries only that part.
+3. After successful upload, frontend tells the backend it is done, then backend calls AWS (CompleteMultipartUpload).
+
+======================== HTTPS — how is it secure? ========================
+
+In HTTP:
+Data is transferred in raw text -> not encrypted -> not secure.
+
+In HTTPS:
+Data is sent over a secured channel -> encrypted -> more secure.
+
+? How does the TLS handshake work?
+
+DNS -> TCP -> TLS ->  HTTP -> Web server -> App server -> Router -> middleware ->  Your code -> Response 
+
+1️⃣ DNS – Maps domain name to IP address of your server's entry point
+2️⃣ TCP – Opens a reliable connection. Packets in order, nothing lost.
+3️⃣ TLS – Encrypts the channel. That's the S in HTTPS. Happens before HTTP.
+4️⃣ HTTP – The language all components speak. Method + URL + headers + body.
+5️⃣ Web Server / Reverse Proxy – Entry point of your infrastructure. SSL termination, load distribution, static files. Forwards dynamic requests deeper.
+6️⃣ Application Server – Manages workers and concurrency. Handles requests simultaneously.
+7️⃣ Router – Reads URL + method. Maps to the right function.
+8️⃣ Middleware – Runs before your logic. Auth, authorization, logging, rate limiting.
+9️⃣ Your Code – Business logic. DB calls. Response built.
+🔟 Response – Same path back. Browser renders it. Under 
+
+======================== Trace_id ========================
+How would you trace the flow of a request through a microservice architecture
+Suppose you request is going through 10 microservices, Suppose one complete flow which was earlier taking only 500ms is not taking 8s.
+how would you debug which service is causing the problem ?
+
+
+This is where span comes into picture 
+Span is the record that holds some information (traceid, spanId, parent_id, starttime, endtime, duration)
+
+For example: Zipkin
+
+Suppos request goes to Service A to B to C, 
+for A (
+    trace_id: abc123
+    spanId: 
+    parent_id: null 
+    ..
+    ..
+
+)
+
+for B (
+    .. 
+    .. 
+    parent_id: spanId of A  
+)
+
+# ======================== Starvation ========================
+
+**Starvation** occurs when a low-priority task waits indefinitely because higher-priority tasks keep getting scheduled.
+
+### Example
+
+Suppose a background worker processes:
+
+* Order confirmation
+* Payment
+* Email notification
+* Writing logs to the database
+
+If **Order confirmation** is assigned a higher priority and new order jobs keep arriving, the other tasks may never get CPU/worker time and become **starved**.
+
+### Solution: Aging
+
+**Aging** gradually increases the priority of a task based on its waiting time, ensuring every task eventually gets executed.
+
+### Open Question
+
+**Why not use separate queues and dedicated workers?**
+
+```
+High Queue -> High Workers
+Low Queue  -> Low Workers
+```
+
+This prevents starvation between queues, but it can lead to poor resource utilization.
+
+**Example:**
+
+```
+High Queue : 100,000 jobs
+Low Queue  : 2 jobs
+
+Workers:
+High Queue -> 1 worker
+Low Queue  -> 1 worker
+```
+
+The low-priority worker becomes idle after finishing its 2 jobs, while the high-priority worker remains overloaded. The challenge shifts from starvation to efficient resource utilization.
+
+# ======================== Gossip Protocol ========================
+In master slave architecture single master handling knowledge of all the servers
+This creates a single point of failure -> if master dies, no one knows the state of the cluster.
+
+Gossip Protocol removes the master.
+Every node talks to a few random nodes periodically and shares whatever it knows.
+Over time, this information spreads to the entire cluster (like a rumour spreading).
+
+How it works:
+Each node maintains a list of all nodes with their state (alive/dead, version/heartbeat).
+
+Every 1 second (gossip round):
+1. Node picks a few random peers.
+2. Sends them its view of the cluster (node states + heartbeat counters).
+3. Peer merges -> keeps the newest version of each node's state.
+
+Example:
+Suppose 5 nodes: A, B, C, D, E
+
+A talks to B    -> now A and B know each other's state
+B talks to D    -> D learns about A too
+D talks to E    -> E learns about A, B
+...
+Within a few rounds every node knows the state of every other node.
+
+If C stops sending heartbeats:
+Some node notices C's heartbeat counter stopped increasing -> marks C as suspect/dead
+-> gossips this -> eventually whole cluster agrees C is down.
+
+Used by:
+Cassandra, DynamoDB, Consul, Redis Cluster
+
+Why it is good:
+No single point of failure (no master)
+Scales well -> each node only talks to a few peers, not all
+Eventually consistent view of cluster membership
+
+# ======================== Oauth2.0 and OIDC ========================
+
+Oauth
+Steps 1:  Register my application on Google Dev console (application, landing page, domain)
+
+Step 2: Google Provide (Client ID, Client Secret) 
+
+Step 3: When user clicks on signin with google frontend Redirects to google authentication page (ccounts.google.com?cleint_id=xxxx&redi_uri=myblog.com)  ->  goggle  redirects to myblog.com but at this time it attach a code 
+myblog.com?code=123
+
+Step 4: Frontend calls backend with ?code=123 -> backend  calls goggle backend with code=123, client_id=xxxx, client_secret -> google verifies it then returns access_token to backend (access_token has all info of user )
+most important part is client_secret 
+
+OIDC:
+OAuth was built for AUTHORIZATION (access to resources), not for proving WHO the user is.
+People started misusing the access_token as proof of login, which is not safe -> the access_token only says "this app can access these resources", it does not securely prove identity.
+
+OIDC (OpenID Connect) is a thin layer on top of OAuth2.0 that adds AUTHENTICATION.
+
+Same steps as OAuth, but with one change:
+In Step 3, frontend also asks for scope=openid.
+In Step 4, along with access_token, google returns an id_token.
+
+id_token:
+A JWT signed by google.
+Contains user identity (sub/user id, email, name, exp).
+Backend verifies the signature using google's public key -> trusts the identity -> logs the user in.
+
+So:
+access_token -> "what can this app do" (authorization)
+id_token     -> "who is this user"      (authentication)
+
+OAuth:
+User
+↓
+Google
+↓
+access_token
+↓
+API access
+
+OIDC:
+User
+↓
+Google
+↓
+id_token
+↓
+Verify JWT
+↓
+Login
+
+Almost the same.
+The difference is what the returned token represents.

@@ -1,0 +1,66 @@
+✅✅ Open Questions ✅✅
+
+======================== Authentication ========================
+
+1. If a user enters the wrong password, what error message does the backend send and what message does the user see?
+   Hint: Always send a generic "Invalid email or password" — never reveal which one was wrong (avoids user enumeration).
+
+2. If two users have the same password, will the hash stored in the DB be the same?
+   If not, why — and how is the hash stored and matched, since the same password produces a different hash?
+   ? What is the role of salting?
+   ? Why is bcrypt intentionally slow?
+   Hint: No — a unique random salt is mixed in per user, so identical passwords get different hashes; the salt is stored alongside the hash and reused at login to recompute and compare. bcrypt is slow on purpose to make brute-force/rainbow-table attacks expensive.
+
+3. Suppose a hacker has some sets of usernames and passwords. He tries those combinations, and after trying those emails and passwords he figures out some set of usernames that are correct but only the password is wrong (i.e. he has found some correct usernames).
+   -> Timing attack.
+   Hint: Existing users take longer (hash is actually computed) vs non-existing ones — fix with constant-time responses (always run a dummy hash even when the user doesn't exist).
+
+======================== Databases ========================
+
+4. What is a write-ahead log (WAL)?
+   Hint: Changes are written to an append-only log on disk BEFORE touching the actual data pages — so on a crash the DB can replay the log to recover (durability).
+
+5. You have 10 min delivery app, what would choose for creating live order update module which shows live status to user
+What would you choose websockets or SSE
+   Hint: SSE — updates are server -> client only (one-way), lighter than websockets, and auto-reconnects; full duplex of websockets is overkill here.
+
+6. How indexing works in DB
+Suppose there are two tables. In the first table, the indexed column is an auto-increment ID (or sequence number). In the second table, the indexed column is age, which can have random values. Why are inserts generally faster in the first table than in the second?
+   Hint: B-tree indexes append sequentially for auto-increment (always at the right edge), but random values cause page splits and random I/O scattered across the tree.
+
+7. Suppose you load has been increased and now you have decided to spin up more servers, how will you decide which request goes to which server ?
+   Hint: A load balancer using a strategy — round robin / least connections, or consistent hashing when you need session/cache affinity (sticky sessions).
+
+8. What is 2PC and what problem of 2PC the saga pattern solves ?
+   Hint: 2PC = coordinator does prepare -> commit across services but holds locks and blocks if coordinator dies; saga replaces it with local commits + compensating transactions (no global locks, eventual consistency).
+
+9. What is thundering herd problem ?
+   Hint: A cache key expires and thousands of requests simultaneously hit the DB to rebuild it — solved with locking/single-flight, request coalescing, or staggered TTLs.
+
+10. Your app is slow , do you reduce latency or increase throughput ?
+   Hint: Depends — if a single request feels slow, reduce latency; if the system chokes under load, increase throughput. Measure first (where is the bottleneck).
+
+11. What is connection pooling, how will you decide the correct pool size.
+   Hint: Reuse a fixed set of DB connections instead of opening new ones each time; size is bounded by the DB's max connections (a common starting point: cores * 2 + effective spindles), tune via load testing.
+
+12. What do you think which one is better single threaded or multi threaded programming languages ?
+What is GIL ? If GIL is limiting python to single threaded, then what is the purpose of keeping GIL.
+   Hint: Neither is universally better — single-threaded (event loop) wins for I/O-bound, multi-threaded for CPU-bound. GIL = one lock letting only one thread run Python bytecode at a time; it's kept to make memory management (reference counting) safe and simple — use multiprocessing for CPU-bound work.
+
+13. How memory management works in python (Garbage collector, Reference counter)
+   Hint: Primary mechanism is reference counting (object freed when refcount hits 0); a cyclic garbage collector runs additionally to clean up reference cycles that refcounting alone can't free.
+
+14. What are the problems which Oauth2.0 solves ? Is this Authentication or Authorization ? How do you implement Oauth2.0 ?
+What is diff between OIDC and Oauth2.0
+   Hint: OAuth2.0 = delegated AUTHORIZATION (let an app access your data without sharing your password); OIDC adds AUTHENTICATION on top via an id_token (JWT) that proves identity. See the answered file for the full flow.
+
+15. what are the types of cacheing present ?
+   Hint: Client/browser, CDN, reverse-proxy, application (in-memory like Redis/Memcached), and database query cache — i.e. caching at every layer of the request path.
+
+16. What is 2 Phase commit in microservice ? How saga patten solves it ? What if compensating transation fails ?
+   Hint: Same as Q8; if a compensating transaction fails, you retry it (must be idempotent) and if it still fails, escalate via dead-letter queue / manual intervention — you can't just abandon it.
+
+17. What is circuit breaker pattern ? Why do we need to implement resillience ?
+   Hint: Stop calling a failing downstream service after N failures (open the circuit), serve a fallback, then probe to recover (half-open) — prevents cascading failures and lets the system stay responsive under partial outages.
+
+18.
