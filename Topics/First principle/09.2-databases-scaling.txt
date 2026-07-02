@@ -11,7 +11,7 @@ Primary DB -> Read Replicas (India, US, Europe)
 Write queries go to primary DB.
 Read queries are distributed to replicas.
 
-Benefits
+🔹 Benefits
 Reduces load on primary DB
 Lower read latency for global users
 Improves read scalability
@@ -31,7 +31,7 @@ Problems:
 cross-shard joins
 distributed transactions
 
-======================== How Replication Works ========================
+━━━━━━━━━━━━━━━ 🔄 How Replication Works ━━━━━━━━━━━━━━━
 
 Flow:
 Primary -> WAL/Binlog -> Replica
@@ -40,7 +40,7 @@ Change written to WAL/Binlog
 Replica reads logs
 Replica replays changes
 
-======================== Replication Modes ========================
+━━━━━━━━━━━━━━━ 🔁 Replication Modes ━━━━━━━━━━━━━━━
 Asynchronous
 Primary does not wait for replica.
 ✅ Fast writes
@@ -56,7 +56,7 @@ Waits for all replicas.
 ✅ Strong consistency
 ❌ High latency
 
-======================== Replication Lag Problem ========================
+━━━━━━━━━━━━━━━ ⏱️ Replication Lag Problem ━━━━━━━━━━━━━━━
 Replication is asynchronous in many databases.
 
 Example:
@@ -70,7 +70,7 @@ This is called:
 Replication Lag
 For payments, invoices, balances, or order status, stale reads can create major consistency problems.
 
-======================== Handling Consistency ========================
+━━━━━━━━━━━━━━━ 🧭 Handling Consistency ━━━━━━━━━━━━━━━
 1. Read-After-Write Consistency
 After a user performs a write:
 temporarily route related reads to primary DB
@@ -90,7 +90,7 @@ Tradeoff:
 better consistency
 higher latency
 
-======================== Sharding ========================
+━━━━━━━━━━━━━━━ 🪓 Sharding ━━━━━━━━━━━━━━━
 
 As tables grow to billions of rows, a single database instance becomes difficult to scale.
 orders table -> billions of rows
@@ -128,7 +128,7 @@ fewer scanned rows
 Writes get distributed across multiple DB instances instead of one primary DB handling everything.
 
 Sharding splits data across multiple databases to distribute load and storage.
-Types of Sharding
+🔹 Types of Sharding
 1. Range Based
 1-1000 -> Shard A
 1001-2000 -> Shard B
@@ -170,7 +170,7 @@ PlanetScale
 Neon
 CockroachDB
 
-======================== Hot Shard Problem ========================
+━━━━━━━━━━━━━━━ 🔥 Hot Shard Problem ━━━━━━━━━━━━━━━
 
 One shard receives disproportionately high traffic.
 Celebrity user -> all traffic hits one shard
@@ -179,13 +179,13 @@ Problems:
 uneven load
 CPU bottleneck
 storage imbalance
-Fixes
+🔹 Fixes
 better shard key
 hashing
 resharding
 consistent hashing
 
-======================== SQL Horizontal Partitioning Tradeoffs ========================
+━━━━━━━━━━━━━━━ ⚖️ SQL Horizontal Partitioning Tradeoffs ━━━━━━━━━━━━━━━
 1. Joins Become Hard
 Cross-shard joins are expensive.
 Query Shard A

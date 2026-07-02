@@ -1,4 +1,4 @@
-======================== IO Bound vs CPU Bound ========================
+━━━━━━━━━━━━━━━ ⚖️ IO Bound vs CPU Bound ━━━━━━━━━━━━━━━
 IO Bound
 Time is mostly spent waiting for:
 DB queries
@@ -19,7 +19,7 @@ compression
 ML inference
 These tasks require actual CPU time and benefit from parallelism/multiple cores.
 
-======================== Threads ========================
+━━━━━━━━━━━━━━━ 🧵 Threads ━━━━━━━━━━━━━━━
 
 A thread is the smallest unit of execution managed by the OS.
 Each thread has:
@@ -38,7 +38,7 @@ Thread A runs for few ms
 -> paused
 -> Thread B runs
 
-Processes vs Threads
+🔹 Processes vs Threads
 
 Processes
 completely isolated
@@ -58,7 +58,7 @@ This can create:
 race conditions
 data corruption
 
-Context Switching
+🔹 Context Switching
 Switching between threads requires:
 saving current state
 restoring another thread state
@@ -68,7 +68,7 @@ Too many threads:
 More context switches -> more overhead
 which can slow down the system.
 
-======================== Event Loop ========================
+━━━━━━━━━━━━━━━ 🔁 Event Loop ━━━━━━━━━━━━━━━
 
 Event loop handles concurrency differently.
 Instead of many OS threads:
@@ -101,14 +101,14 @@ balance = -100
 This is a:
 Race Condition
 
-Solution
+🔹 Solution
 Use:
 locks
 mutexes
 transactions
 atomic operations
 
-======================== Parallelism ========================
+━━━━━━━━━━━━━━━ ⚡ Parallelism ━━━━━━━━━━━━━━━
 
 Executing multiple instructions truly at the same time.
 
@@ -121,7 +121,8 @@ Core 2 -> Task B
 
 Best for:
 CPU-heavy workloads
-======================== Concurrency ========================
+
+━━━━━━━━━━━━━━━ 🧩 Concurrency ━━━━━━━━━━━━━━━
 
 Structuring programs so multiple tasks can:
 start

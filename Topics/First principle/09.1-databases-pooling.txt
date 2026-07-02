@@ -15,7 +15,7 @@ MySQL default ≈ 151
 
 During traffic spikes, applications can exhaust DB connections and cause failures.
 
-Connection Pooling
+🔗 Connection Pooling
 Instead of creating new connections repeatedly, applications reuse existing DB connections.
 
 Flow:
@@ -26,7 +26,7 @@ Connection returns to pool instead of closing
 
 This avoids repeated connection setup overhead and improves performance.
 
-Types
+🗂️ Types
 Internal Pooling
 Pooling inside application instances.
 Problem:
@@ -61,7 +61,7 @@ const pool = mysql.createPool({
   connectTimeout: 5000
 });
 
-connectionLimit (maxConnections)
+⚙️ connectionLimit (maxConnections)
 Maximum DB connections pool can create.
 connectionLimit: 100
 
@@ -72,7 +72,7 @@ or fail after timeout
 Too high → DB overload
 Too low → request queueing
 
-maxIdle
+⚙️ maxIdle
 Maximum idle connections kept open.
 maxIdle: 10
 Reuses existing connections instead of reopening TCP/auth/session repeatedly.
@@ -80,12 +80,12 @@ Reuses existing connections instead of reopening TCP/auth/session repeatedly.
 Too high → wasted DB resources
 Too low → reconnect overhead
 
-idleTimeout
+⚙️ idleTimeout
 How long idle connections stay open.
 idleTimeout: 30000
 Unused connections are closed after 30s.
 
-connectTimeout
+⚙️ connectTimeout
 Maximum wait time while establishing DB connection.
 connectTimeout: 5000
 Prevents requests hanging forever during DB/network issues.

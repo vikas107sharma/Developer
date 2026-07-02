@@ -1,0 +1,41 @@
+URL:
+https://api.example.com/v1/books/123  > 
+sceme + subdomain + version
+
+━━━━━━━━━━━━━━━ 🔐 HTTPS — how is it secure? ━━━━━━━━━━━━━━━
+
+In HTTP:
+Data is transferred in raw text -> not encrypted -> not secure.
+
+In HTTPS:
+Data is sent over a secured channel -> encrypted -> more secure.
+
+? How does the TLS handshake work?
+
+DNS -> TCP -> TLS ->  HTTP -> Web server -> App server -> Router -> middleware ->  Your code -> Response 
+
+1️⃣ DNS – Maps domain name to IP address of your server's entry point
+2️⃣ TCP – Opens a reliable connection. Packets in order, nothing lost.
+3️⃣ TLS – Encrypts the channel. That's the S in HTTPS. Happens before HTTP.
+4️⃣ HTTP – The language all components speak. Method + URL + headers + body.
+5️⃣ Web Server / Reverse Proxy – Entry point of your infrastructure. SSL termination, load distribution, static files. Forwards dynamic requests deeper.
+6️⃣ Application Server – Manages workers and concurrency. Handles requests simultaneously.
+7️⃣ Router – Reads URL + method. Maps to the right function.
+8️⃣ Middleware – Runs before your logic. Auth, authorization, logging, rate limiting.
+9️⃣ Your Code – Business logic. DB calls. Response built.
+🔟 Response – Same path back. Browser renders it. Under 
+
+
+# ━━━━━━━━━━━━━━━ 🌐 GRPC ━━━━━━━━━━━━━━━
+
+How does netflix handles communication between 1000 of microservices ?
+If your answer is REST, then it is wrong, although rest is simple send a json request and receives a json response
+but to do so, you need to serialize and desearilize, if you are doing billions of these calls then its a problem 
+then it starts adding up, there are lot of microservices which are interlinked, if one of the api response is changed little bit then it can starts a chain reaction 
+
+The fix was bringing GRPC instead of rest 
+
+What is GRPC
+Uses protocol buffers (binary serialization) Sends data directly in binary 
+Runs of HTTP/2 (Single connection)
+Services share a .proto schema (contract). Client/server code is generated from it. Breaking schema changes are detected during code generation or compilation instead of causing runtime failures.

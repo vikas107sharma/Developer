@@ -1,0 +1,81 @@
+✅✅ Open Questions ✅✅
+
+━━━━━━━━━━━━━━━ 📤 How to upload a 1 GB file on S3 ━━━━━━━━━━━━━━━
+
+Steps:
+1. Backend creates a CreateMultipartUpload and divides the file into chunks (say it comes out to 21), then returns 21 presigned URLs to the frontend.
+2. Frontend uploads to those URLs with retries — e.g. if the 5th chunk fails, it retries only that part.
+3. After successful upload, frontend tells the backend it is done, then backend calls AWS (CompleteMultipartUpload).
+
+━━━━━━━━━━━━━━━ 🔎 Trace_id ━━━━━━━━━━━━━━━
+
+How would you trace the flow of a request through a microservice architecture
+Suppose you request is going through 10 microservices, Suppose one complete flow which was earlier taking only 500ms is not taking 8s.
+how would you debug which service is causing the problem ?
+
+
+This is where span comes into picture 
+Span is the record that holds some information (traceid, spanId, parent_id, starttime, endtime, duration)
+
+For example: Zipkin
+
+Suppos request goes to Service A to B to C, 
+for A (
+    trace_id: abc123
+    spanId: 
+    parent_id: null 
+    ..
+    ..
+
+)
+
+for B (
+    .. 
+    .. 
+    parent_id: spanId of A  
+)
+
+# ━━━━━━━━━━━━━━━ ⏳ Starvation ━━━━━━━━━━━━━━━
+
+**Starvation** occurs when a low-priority task waits indefinitely because higher-priority tasks keep getting scheduled.
+
+### Example
+
+Suppose a background worker processes:
+
+* Order confirmation
+* Payment
+* Email notification
+* Writing logs to the database
+
+If **Order confirmation** is assigned a higher priority and new order jobs keep arriving, the other tasks may never get CPU/worker time and become **starved**.
+
+### Solution: Aging
+
+**Aging** gradually increases the priority of a task based on its waiting time, ensuring every task eventually gets executed.
+
+### Open Question
+
+**Why not use separate queues and dedicated workers?**
+
+```
+High Queue -> High Workers
+Low Queue  -> Low Workers
+```
+
+This prevents starvation between queues, but it can lead to poor resource utilization.
+
+**Example:**
+
+```
+High Queue : 100,000 jobs
+Low Queue  : 2 jobs
+
+Workers:
+High Queue -> 1 worker
+Low Queue  -> 1 worker
+```
+
+The low-priority worker becomes idle after finishing its 2 jobs, while the high-priority worker remains overloaded. The challenge shifts from starvation to efficient resource utilization.
+
+

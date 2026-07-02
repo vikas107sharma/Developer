@@ -1,4 +1,4 @@
-✅✅ 2-Phase Commit (2PC) ✅✅
+━━━━━━━━━━━━━━━ 💸 2-Phase Commit (2PC) ━━━━━━━━━━━━━━━
 
 Used for distributed transactions where multiple services/databases must either:
 
@@ -30,7 +30,7 @@ Coordinator -> COMMIT
 Otherwise:
 Coordinator -> ROLLBACK
 
-Problems with 2PC
+🔹 Problems with 2PC
 1. Slowest Service Controls Transaction
 Overall latency depends on the slowest participant.
 
@@ -45,7 +45,7 @@ locks may never release
 services don't know whether to commit or rollback
 
 
-✅✅ Saga Pattern ✅✅
+━━━━━━━━━━━━━━━ 🔁 Saga Pattern ━━━━━━━━━━━━━━━
 
 SAGA is a sequence of local transactions.
 If one fails, compensating transactions
@@ -75,7 +75,7 @@ Accounting -> reverse entry
 These are:
 Business-level rollbacks
 
-Saga Types
+🔹 Saga Types
 1. Choreography
 Services communicate using events.
 No central controller.
@@ -93,7 +93,7 @@ Unlike 2PC:
 no global locks remain stuck
 services are not blocked waiting forever
 
-Problems with Sagas
+🔹 Problems with Sagas
 Compensation is Messy
 Undoing business actions is difficult.
 

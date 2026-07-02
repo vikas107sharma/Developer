@@ -13,7 +13,7 @@ P95 = 200ms
 P99 = 2s
 This usually means most requests are fast, but a few are extremely slow.
 
-======================== Slowness is Not Always Database ========================
+━━━━━━━━━━━━━━━ 🐢 Slowness is Not Always Database ━━━━━━━━━━━━━━━
 Database queries are not always the bottleneck.
 
 Other common causes:
@@ -28,7 +28,7 @@ Remote logging/monitoring calls
 Example:
 A synchronous logging call to Elasticsearch can slow requests even when DB queries are optimized.
 
-======================== Profiling ========================
+━━━━━━━━━━━━━━━ 🔬 Profiling ━━━━━━━━━━━━━━━
 Profiling is the process of measuring where an application spends time, CPU, memory, or I/O.
 It helps identify the real bottleneck instead of guessing.
 
@@ -179,7 +179,7 @@ sometimes combined with least connections
 
 Helps avoid slow or overloaded servers dynamically.
 
-======================== Health Checks ========================
+━━━━━━━━━━━━━━━ ❤️ Health Checks ━━━━━━━━━━━━━━━
 
 Load balancers continuously monitor server health.
 
@@ -198,6 +198,43 @@ Healthy -> traffic allowed
 502/timeout -> removed from rotation
 Recovered -> added back
 
+━━━━━━━━━━━━━━━ 🗣️ Gossip Protocol ━━━━━━━━━━━━━━━
+In master slave architecture single master handling knowledge of all the servers
+This creates a single point of failure -> if master dies, no one knows the state of the cluster.
+
+Gossip Protocol removes the master.
+Every node talks to a few random nodes periodically and shares whatever it knows.
+Over time, this information spreads to the entire cluster (like a rumour spreading).
+
+How it works:
+Each node maintains a list of all nodes with their state (alive/dead, version/heartbeat).
+
+Every 1 second (gossip round):
+1. Node picks a few random peers.
+2. Sends them its view of the cluster (node states + heartbeat counters).
+3. Peer merges -> keeps the newest version of each node's state.
+
+Example:
+Suppose 5 nodes: A, B, C, D, E
+
+A talks to B    -> now A and B know each other's state
+B talks to D    -> D learns about A too
+D talks to E    -> E learns about A, B
+...
+Within a few rounds every node knows the state of every other node.
+
+If C stops sending heartbeats:
+Some node notices C's heartbeat counter stopped increasing -> marks C as suspect/dead
+-> gossips this -> eventually whole cluster agrees C is down.
+
+Used by:
+Cassandra, DynamoDB, Consul, Redis Cluster
+
+Why it is good:
+No single point of failure (no master)
+Scales well -> each node only talks to a few peers, not all
+Eventually consistent view of cluster membership
+
 
 ✅✅ CDN (cloudflare) ✅✅
 
@@ -210,7 +247,7 @@ Type of content we put into cdn
 2. API resposne: product catalog 
 3. Security: DDOS request first goes to cloudflare instead of servers 
 
-======================== Edge Computing ========================
+━━━━━━━━━━━━━━━ 🌍 Edge Computing ━━━━━━━━━━━━━━━
 
 Edge computing means running code closer to users instead of a centralized server.
 Instead of:

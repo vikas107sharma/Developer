@@ -1,18 +1,18 @@
 ✅✅ Database ✅✅
-Atomicity:
+🔹 Atomicity:
   Transactions all or nothing
 
-Consistency:
+🔹 Consistency:
   DB moves from one valid move to other
   Constraints are always respected
 
-Isotation:
+🔹 Isotation:
   Transactions do not see each other
 
-Durability:
+🔹 Durability:
   Once commited it stays forever
 
-======================== Isolation Problems ========================
+━━━━━━━━━━━━━━━ ⚠️ Isolation Problems ━━━━━━━━━━━━━━━
 
 Dirty read:
   Read uncommitted data of another transaction
@@ -41,7 +41,7 @@ Lost update:
   T1 updates -> 80
   T2 updates -> 70 (overwrites T1)
 
-======================== Database Indexes ========================
+━━━━━━━━━━━━━━━ 🔎 Database Indexes ━━━━━━━━━━━━━━━
 
 Indexes are data structures that help databases find rows faster without scanning the full table.
 
@@ -54,7 +54,7 @@ Most databases use:
 B-Tree indexes
 for efficient searching and sorting.
 
-======================== Composite Index ========================
+━━━━━━━━━━━━━━━ 🧩 Composite Index ━━━━━━━━━━━━━━━
 
 INDEX(user_id, created_at)
 Leftmost Prefix Rule
@@ -68,7 +68,7 @@ created_at only
 
 because indexes are ordered from left to right.
 
-======================== Why Indexes Slow Down Writes ========================
+━━━━━━━━━━━━━━━ 🐢 Why Indexes Slow Down Writes ━━━━━━━━━━━━━━━
 
 Indexes improve reads but increase write cost.
 
@@ -86,7 +86,7 @@ slower writes
 higher storage usage
 more memory consumption
 
-======================== When Indexes Are Not Used ========================
+━━━━━━━━━━━━━━━ 🚫 When Indexes Are Not Used ━━━━━━━━━━━━━━━
 1. Low Cardinality Columns
 
 Columns with very few unique values are poor candidates for indexing.
@@ -112,13 +112,13 @@ Works better:
 LIKE 'abc%'
 because index traversal can start from prefix order.
 
-======================== Indexing Strategies ========================
+━━━━━━━━━━━━━━━ 🎯 Indexing Strategies ━━━━━━━━━━━━━━━
 Which queries are frequent ?
 Which columns appear in where ?
 Which columns appear in JOIN ?
 Which columns appear in ORDER BY ?
 
-======================== Physical Storage of Index ========================
+━━━━━━━━━━━━━━━ 💾 Physical Storage of Index ━━━━━━━━━━━━━━━
 
 Indexes are stored separately from table data.
 
@@ -132,7 +132,7 @@ Stored on:
 SSD/HDD
 frequently accessed parts cached in RAM
 
-======================== How DB Uses an Index ========================
+━━━━━━━━━━━━━━━ 🌳 How DB Uses an Index ━━━━━━━━━━━━━━━
 
 Query execution flow:
 
@@ -142,7 +142,7 @@ Root -> Internal Nodes -> Leaf Node
 Find row pointer
 Fetch actual row from table
 
-======================== Normalization ========================
+━━━━━━━━━━━━━━━ 📐 Normalization ━━━━━━━━━━━━━━━
 1NF
 Atomic/single values only.
 
@@ -157,7 +157,7 @@ Too many joins
 Slow read performance
 Complex queries
 
-======================== How DB Executes a JOIN ========================
+━━━━━━━━━━━━━━━ 🔗 How DB Executes a JOIN ━━━━━━━━━━━━━━━
 1. Nested Loop Join
 For each row in table A, DB scans matching rows in table B.
 Slow without indexes.
@@ -167,12 +167,12 @@ For each row in table A:
 Use index on table B
 Very efficient when join columns are indexed.
 
-======================== Best Practices for JOIN ========================
+━━━━━━━━━━━━━━━ ✅ Best Practices for JOIN ━━━━━━━━━━━━━━━
 Index foreign keys
 Avoid SELECT *
 Join smaller datasets first
 
-======================== JOIN vs Denormalization ========================
+━━━━━━━━━━━━━━━ ⚖️ JOIN vs Denormalization ━━━━━━━━━━━━━━━
 
 Many joins:
 Normalized -> slower reads

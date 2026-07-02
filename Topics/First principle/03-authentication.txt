@@ -77,7 +77,7 @@ Payload (JSON)
 }
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 
-======================== Logout ========================
+━━━━━━━━━━━━━━━ 🚪 Logout ━━━━━━━━━━━━━━━
 
 In JWT-based authentication:
 Logout usually happens only on client side.
@@ -102,11 +102,142 @@ Token blacklist/blocklist in Redis/DB
 
 Otherwise “logout” is mostly fake from server perspective.
 
-======================== Revoke users (Logged out from backend) ========================
+━━━━━━━━━━━━━━━ 🔒 Revoke users (Logged out from backend) ━━━━━━━━━━━━━━━
 1. Change the secret key: It will log out all the users
 2. Hybrid: use both stateless and stateful -> verify jwt then confirm this with blocklist stored in db
 
 ? The whole point is if you have to use persistence storage why not use stateful approach in the first place  
+
+A user's account is suspended, but their JWT is still valid for 12 more hours. They are still able to access the system. How would you block access immediately ? 
+
+Option 1: Check the user status in the database (Most common)
+
+Even if the JWT is valid, check whether the user is still active.
+
+Flow:
+
+Request
+    │
+    ▼
+Verify JWT
+    │
+    ▼
+Extract userId
+    │
+    ▼
+Query DB
+    │
+    ▼
+Is user suspended?
+      │
+   Yes ▼ No
+  403   Continue
+
+Example:
+
+const payload = verifyJwt(token);
+
+const user = await userRepository.findById(payload.sub);
+
+if (user.status === 'SUSPENDED') {
+    throw new ForbiddenError();
+}
+Pros
+Immediate effect.
+Simple.
+No token revocation mechanism required.
+Cons
+One database (or cache) lookup per authenticated request.
+
+A common optimization is to cache the user status in Redis.
+
+Option 2: Token Version (Recommended for many systems)
+
+Add a tokenVersion field to the user record.
+
+Database:
+
+id    status     tokenVersion
+1     ACTIVE     3
+
+JWT:
+
+{
+    "sub": 1,
+    "tokenVersion": 3
+}
+
+On every request:
+
+Verify JWT.
+Read current tokenVersion from DB/Redis.
+Compare.
+
+If they differ:
+
+Reject.
+
+When suspending a user:
+
+UPDATE users
+SET token_version = token_version + 1
+WHERE id = 1;
+
+All existing tokens become invalid immediately.
+
+Option 3: JWT Blacklist
+
+Store revoked JWT IDs (jti) in Redis.
+
+JWT:
+
+{
+    "sub": 1,
+    "jti": "abc123"
+}
+
+When suspending:
+
+Redis
+
+abc123 -> revoked
+
+Every request:
+
+Verify JWT
+
+↓
+
+Check Redis
+
+↓
+
+Rejected?
+Pros
+
+Immediate revocation.
+
+Cons
+
+Redis lookup on every request and storage for revoked tokens until they expire.
+
+Option 4: Short-lived Access Tokens + Refresh Tokens (Industry standard)
+
+Issue:
+
+Access Token
+5–15 minutes
+
+Refresh Token
+30 days
+
+If a user is suspended:
+
+Delete or revoke the refresh token.
+Existing access token expires within minutes.
+No new access tokens can be issued.
+
+This limits the window of access without checking the database on every request.
 
 
 ✅✅ API KEY AUTHENTICATION ✅✅
@@ -200,7 +331,7 @@ You must take measures to equalize the response time.
 
 ✅✅ Password Salting & Verification ✅✅
 
-======================== Why Same Passwords Have Different Hashes ========================
+━━━━━━━━━━━━━━━ 🧂 Why Same Passwords Have Different Hashes ━━━━━━━━━━━━━━━
 
 Every time a password is saved, modern hashing algorithms (like bcrypt or argon2) generate a cryptographically secure, random 22-character salt.
 
@@ -210,7 +341,7 @@ User B: "admin123" + Salt_B ---> Hash_B
 Even though the plaintext inputs are identical, the unique salts ensure that the final output hashes in the database are completely distinct.
 This completely eliminates rainbow table (precomputed) attacks.
 
-======================== How the Salt is Stored (Anatomy of a Hash) ========================
+━━━━━━━━━━━━━━━ 🔬 How the Salt is Stored (Anatomy of a Hash) ━━━━━━━━━━━━━━━
 
 The salt is not stored in a separate database column. It is encoded directly into the final hash string stored in your password column.
 
@@ -222,7 +353,7 @@ $12$                   ---> Cost factor (work factor / iterations)
 R9h/cIPz0gi.URNZX3vOp. ---> The Salt (the exact 22 characters)
 1W3exwK3d6BMXW2w56G1Q1s... ---> The actual hashed password payload
 
-======================== Verification Flow (How it Compares) ========================
+━━━━━━━━━━━━━━━ ✅ Verification Flow (How it Compares) ━━━━━━━━━━━━━━━
 
 When a user attempts to log in with a plaintext password, the backend does not hash it immediately. It follows this strict sequence:
 
@@ -231,7 +362,7 @@ When a user attempts to log in with a plaintext password, the backend does not h
 3. Re-Hash with Extracted Salt: Hash the incoming plaintext password using the exact salt just clipped from the database.
 4. Constant-Time Comparison: Compare the newly generated hash against the stored hash payload. If they match, the password is correct.
 
-======================== Pepper ========================
+━━━━━━━━━━━━━━━ 🌶️ Pepper ━━━━━━━━━━━━━━━
 
 Salt is stored along with the hash in the database and is not meant to be secret.
 If an attacker steals the database, they obtain both the salt and the hash, allowing offline brute-force attacks.
@@ -239,7 +370,7 @@ If an attacker steals the database, they obtain both the salt and the hash, allo
 To add another layer of protection, a secret value called a pepper is appended before hashing.
 Unlike the salt, the pepper is never stored in the database — it is kept in environment variables or a secret manager.
 
-======================== Why bcrypt is Intentionally Slow ========================
+━━━━━━━━━━━━━━━ 🐢 Why bcrypt is Intentionally Slow ━━━━━━━━━━━━━━━
 
 Example:
 SHA-256    → ~1 billion hashes/sec (GPU)
@@ -247,3 +378,60 @@ bcrypt     → ~100–1000 hashes/sec
 
 Now every password guess is expensive.
 Attacker's brute force becomes thousands or millions of times slower.
+
+━━━━━━━━━━━━━━━ 🔑 Oauth2.0 and OIDC ━━━━━━━━━━━━━━━
+
+Oauth
+Steps 1:  Register my application on Google Dev console (application, landing page, domain)
+
+Step 2: Google Provide (Client ID, Client Secret) 
+
+Step 3: When user clicks on signin with google frontend Redirects to google authentication page (ccounts.google.com?cleint_id=xxxx&redi_uri=myblog.com)  ->  goggle  redirects to myblog.com but at this time it attach a code 
+myblog.com?code=123
+
+Step 4: Frontend calls backend with ?code=123 -> backend  calls goggle backend with code=123, client_id=xxxx, client_secret -> google verifies it then returns access_token to backend (access_token has all info of user )
+most important part is client_secret 
+
+OIDC:
+OAuth was built for AUTHORIZATION (access to resources), not for proving WHO the user is.
+People started misusing the access_token as proof of login, which is not safe -> the access_token only says "this app can access these resources", it does not securely prove identity.
+
+OIDC (OpenID Connect) is a thin layer on top of OAuth2.0 that adds AUTHENTICATION.
+
+Same steps as OAuth, but with one change:
+In Step 3, frontend also asks for scope=openid.
+In Step 4, along with access_token, google returns an id_token.
+
+id_token:
+A JWT signed by google.
+Contains user identity (sub/user id, email, name, exp).
+Backend verifies the signature using google's public key -> trusts the identity -> logs the user in.
+
+So:
+access_token -> "what can this app do" (authorization)
+id_token     -> "who is this user"      (authentication)
+
+OAuth:
+User
+↓
+Google
+↓
+access_token
+↓
+API access
+
+OIDC:
+User
+↓
+Google
+↓
+id_token
+↓
+Verify JWT
+↓
+Login
+
+Almost the same.
+The difference is what the returned token represents.
+
+

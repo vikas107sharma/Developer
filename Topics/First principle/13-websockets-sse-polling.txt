@@ -1,4 +1,4 @@
-======================== WebSockets ========================
+━━━━━━━━━━━━━━━ 🔌 WebSockets ━━━━━━━━━━━━━━━
 
 WebSockets create a persistent full-duplex connection between client and server.
 
@@ -17,7 +17,7 @@ Chat applications
 Live trading
 Multiplayer games
 Live notifications
-Scaling Challenges
+🔹 Scaling Challenges
 
 WebSockets are stateful.
 
@@ -39,7 +39,7 @@ connection tracking
 
 This makes horizontal scaling harder.
 
-======================== Short Polling ========================
+━━━━━━━━━━━━━━━ 🔁 Short Polling ━━━━━━━━━━━━━━━
 
 Client requests data at fixed intervals.
 
@@ -55,7 +55,7 @@ Drawbacks
 Many unnecessary requests
 Higher latency between updates
 
-======================== Long Polling ========================
+━━━━━━━━━━━━━━━ ⏳ Long Polling ━━━━━━━━━━━━━━━
 
 Client sends request.
 
@@ -77,7 +77,7 @@ Drawbacks
 Open connections consume resources
 Harder to scale than short polling
 
-======================== Server-Sent Events (SSE) ========================
+━━━━━━━━━━━━━━━ 📡 Server-Sent Events (SSE) ━━━━━━━━━━━━━━━
 
 Persistent one-way connection from server to client.
 
@@ -100,7 +100,7 @@ Drawbacks
 One-way communication only
 Less flexible than WebSockets
 
-======================== Quick Comparison ========================
+━━━━━━━━━━━━━━━ 📊 Quick Comparison ━━━━━━━━━━━━━━━
 Method	Direction	Scaling
 Short Polling	Request/Response	Easy
 Long Polling	Request/Response (held open)	Medium

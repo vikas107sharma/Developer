@@ -1,9 +1,9 @@
 
-# ======================== CQRS ========================
+# ━━━━━━━━━━━━━━━ 🔄 CQRS ━━━━━━━━━━━━━━━
 Your reads are 100x heavier than your writes, How would you design it ?
 Before saying "increase the read replicas", ask if the read and writes are of the same shape, then this might not be the best answer the answer to this is CQRS (Command Query Responsibility Segregation)
 
-Without CQRS
+🔹 Without CQRS
 
 Suppose you're building an e-commerce application.
 
@@ -35,7 +35,7 @@ Now imagine 10 million users are viewing their order history.
 
 Every request executes those joins.
 
-With CQRS
+🔹 With CQRS
 
 The write side stays exactly the same.
 
@@ -79,7 +79,7 @@ No calculations.
 The expensive work was done once, when the order changed—not every time someone views it.
 
 
-Complete example 
+🔹 Complete example 
 Step 1: User creates an order
 
 The write database stores normalized data.

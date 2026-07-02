@@ -29,7 +29,7 @@ If your system is read heavy (Reduce the load on db)
 To reduce the latency
 Expensive query precompute
 
-======================== Types of caching ========================
+━━━━━━━━━━━━━━━ 📦 Types of caching ━━━━━━━━━━━━━━━
 
 A. Client-side cache
 Browser/mobile cache.
@@ -73,7 +73,7 @@ Common tools:
 Redis
 Memcached
 
-Advantages:
+✅ Advantages:
 Shared cache across instances
 Reduces DB load
 Better consistency
@@ -90,12 +90,12 @@ Distributed locks
 Persistence
 Advanced data structures
 
-======================== Cache Patterns ========================
+━━━━━━━━━━━━━━━ 🔁 Cache Patterns ━━━━━━━━━━━━━━━
 https://www.youtube.com/shorts/6ilTc2ayWDY
 C:\Developer\Developer\Topics\First principle\assets\caching.png
 
 
-======================== Eviction policies ========================
+━━━━━━━━━━━━━━━ 🗑️ Eviction policies ━━━━━━━━━━━━━━━
 
 LRU
 Least recently used removed.
@@ -112,7 +112,7 @@ noeviction
 Writes fail when memory full.
 Critical for reliability-sensitive systems.
 
-======================== Cache invalidation ========================
+━━━━━━━━━━━━━━━ 🧹 Cache invalidation ━━━━━━━━━━━━━━━
 
 A. TTL based (Time based)
 SET user:1 data EX 300
@@ -150,7 +150,7 @@ E. Cache aside pattern
 Update DB 
 Delete from cache
 
-======================== Cache Hit Ratio ========================
+━━━━━━━━━━━━━━━ 🎯 Cache Hit Ratio ━━━━━━━━━━━━━━━
 
 Percentage of requests served directly from cache instead of hitting the database.
 Cache Hit Ratio = Cache Hits / Total Requests
@@ -164,7 +164,7 @@ Cache eviction strategy
 Example:
 90 cache hits out of 100 requests = 90% hit ratio
 
-======================== Cache stampede ========================
+━━━━━━━━━━━━━━━ 🐘 Cache stampede ━━━━━━━━━━━━━━━
 Thundering herd problem 
 Causes when:
 TTL expires 
@@ -178,7 +178,7 @@ All hit DB.
 DB dies.
 -> thundering herd
 
-Solutions
+🔹 Solutions
 A. Mutex locking
 Only one request rebuilds cache.
 Others wait/retry.
@@ -211,7 +211,7 @@ Used for:
     Config 
     Hot data 
 
-======================== Hot keys ========================
+━━━━━━━━━━━━━━━ 🔥 Hot keys ━━━━━━━━━━━━━━━
 
 One key gets huge traffic.
 
@@ -222,7 +222,7 @@ Problem:
 single Redis node bottleneck
 uneven load
 
-Solutions:
+🔹 Solutions:
 Local Cache (First level cache)
     server local memory -> redis -> db 
 
@@ -275,7 +275,7 @@ How redis handles so many requests in a single thread
 
 
  
-======================== Open Questions ========================
+━━━━━━━━━━━━━━━ ❓ Open Questions ━━━━━━━━━━━━━━━
 
 Real interview architecture answer
 

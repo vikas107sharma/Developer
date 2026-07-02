@@ -6,14 +6,14 @@ Imagine
 Client: example.com
 Server: api.example.com
 
-======================== Simple Request (GET, POST)) ========================
+━━━━━━━━━━━━━━━ 🌐 Simple Request (GET, POST)) ━━━━━━━━━━━━━━━
 
 GET/api/products/123 HTTP/1.1
 Host: api.anotherdomain.com
 Origin: https://example.com
 Accept: application/json   
 
-Response:
+🔹 Response:
 HTTP/1.1 200 OK
 Content-Type: application/json
 Access-Control-Allow-Origin: https://example.com        [Allowed the origin]
@@ -33,7 +33,7 @@ Content-Type: application/json    [Server is on api.example.com and allow origin
     price 29.99
 }
 
-======================== Pre flight Request (PUT, DELETE, PATCH) ========================
+━━━━━━━━━━━━━━━ 🚦 Pre flight Request (PUT, DELETE, PATCH) ━━━━━━━━━━━━━━━
 
 This exist when one of these 3 true:
 a. Non-Standard HTTP Methods (PUT, DELETE, PATCH)

@@ -1,7 +1,7 @@
 ```text
 ✅✅ Nginx + Node.js Concurrency Model ✅✅
 
-======================== Why Nginx Exists In Front Of Node.js ========================
+━━━━━━━━━━━━━━━ 🔀 Why Nginx Exists In Front Of Node.js ━━━━━━━━━━━━━━━
 
 Node.js can directly serve requests:
 
@@ -31,7 +31,7 @@ business logic
 database access
 API handling
 
-======================== Event Loop In Nginx ========================
+━━━━━━━━━━━━━━━ 🔁 Event Loop In Nginx ━━━━━━━━━━━━━━━
 
 Each Nginx worker process runs:
 
@@ -65,7 +65,7 @@ keep-alive
 
 CPU usage remains low.
 
-======================== Event Loop In Node.js ========================
+━━━━━━━━━━━━━━━ 🔁 Event Loop In Node.js ━━━━━━━━━━━━━━━
 
 Node.js also uses:
 
@@ -92,7 +92,7 @@ Continues serving other requests
 
 Node does not block while waiting for I/O.
 
-======================== What Happens When Nginx Is In Front Of Node ========================
+━━━━━━━━━━━━━━━ 🔀 What Happens When Nginx Is In Front Of Node ━━━━━━━━━━━━━━━
 
 Request flow:
 
@@ -112,7 +112,7 @@ handles network layer
 Node event loop:
 handles application layer
 
-======================== Example Request Lifecycle ========================
+━━━━━━━━━━━━━━━ 📨 Example Request Lifecycle ━━━━━━━━━━━━━━━
 
 Client sends request
 
@@ -154,7 +154,7 @@ Nginx
    ↓
 Client
 
-======================== Common Misconception ========================
+━━━━━━━━━━━━━━━ ⚠️ Common Misconception ━━━━━━━━━━━━━━━
 
 Suppose:
 
@@ -172,7 +172,7 @@ Wrong:
 
 This is incorrect.
 
-======================== Why Capacities Do Not Multiply ========================
+━━━━━━━━━━━━━━━ 🧮 Why Capacities Do Not Multiply ━━━━━━━━━━━━━━━
 
 Think of a restaurant.
 
@@ -202,7 +202,7 @@ Nginx
 
 Throughput depends on slowest component.
 
-======================== Real Capacity Formula ========================
+━━━━━━━━━━━━━━━ 📐 Real Capacity Formula ━━━━━━━━━━━━━━━
 
 System Throughput ≈
 
@@ -231,7 +231,7 @@ System behaves closer to:
 
 200 concurrent DB operations
 
-======================== Why Node Handles Many Requests ========================
+━━━━━━━━━━━━━━━ ⚡ Why Node Handles Many Requests ━━━━━━━━━━━━━━━
 
 Node is excellent for:
 
@@ -256,7 +256,7 @@ Event Loop serves other requests
 
 This creates high concurrency.
 
-======================== Where Node Struggles ========================
+━━━━━━━━━━━━━━━ 🐢 Where Node Struggles ━━━━━━━━━━━━━━━
 
 CPU-intensive work.
 
@@ -278,7 +278,7 @@ Event loop becomes blocked.
 
 All requests wait.
 
-======================== Solving CPU Work In Node ========================
+━━━━━━━━━━━━━━━ 🛠️ Solving CPU Work In Node ━━━━━━━━━━━━━━━
 
 Options:
 
@@ -296,7 +296,7 @@ Worker Process
 
 Keeps API responsive.
 
-======================== What PM2 Cluster Actually Does ========================
+━━━━━━━━━━━━━━━ 🧵 What PM2 Cluster Actually Does ━━━━━━━━━━━━━━━
 
 Node process uses:
 
@@ -327,7 +327,7 @@ Node Process 8
 
 Now all cores are used.
 
-======================== How Go Is Different ========================
+━━━━━━━━━━━━━━━ 🐹 How Go Is Different ━━━━━━━━━━━━━━━
 
 Node:
 
@@ -357,7 +357,7 @@ Runtime automatically utilizes all cores.
 
 No PM2 needed.
 
-======================== Node vs Go Concurrency ========================
+━━━━━━━━━━━━━━━ ⚖️ Node vs Go Concurrency ━━━━━━━━━━━━━━━
 
 Node:
 
@@ -391,7 +391,7 @@ Excellent for:
 I/O workloads
 CPU workloads
 
-======================== Modern Production Deployment ========================
+━━━━━━━━━━━━━━━ 🚀 Modern Production Deployment ━━━━━━━━━━━━━━━
 
 Traditional:
 
@@ -422,7 +422,7 @@ Ingress Controllers
 Envoy
 HAProxy
 
-======================== Key Takeaways ========================
+━━━━━━━━━━━━━━━ 🔑 Key Takeaways ━━━━━━━━━━━━━━━
 
 Nginx and Node both have event loops.
 

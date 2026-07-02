@@ -1,7 +1,5 @@
 ✅✅ Open Questions ✅✅
 
-======================== Authentication ========================
-
 1. If a user enters the wrong password, what error message does the backend send and what message does the user see?
    Hint: Always send a generic "Invalid email or password" — never reveal which one was wrong (avoids user enumeration).
 
@@ -14,8 +12,6 @@
 3. Suppose a hacker has some sets of usernames and passwords. He tries those combinations, and after trying those emails and passwords he figures out some set of usernames that are correct but only the password is wrong (i.e. he has found some correct usernames).
    -> Timing attack.
    Hint: Existing users take longer (hash is actually computed) vs non-existing ones — fix with constant-time responses (always run a dummy hash even when the user doesn't exist).
-
-======================== Databases ========================
 
 4. What is a write-ahead log (WAL)?
    Hint: Changes are written to an append-only log on disk BEFORE touching the actual data pages — so on a crash the DB can replay the log to recover (durability).
@@ -54,7 +50,7 @@ What is GIL ? If GIL is limiting python to single threaded, then what is the pur
 What is diff between OIDC and Oauth2.0
    Hint: OAuth2.0 = delegated AUTHORIZATION (let an app access your data without sharing your password); OIDC adds AUTHENTICATION on top via an id_token (JWT) that proves identity. See the answered file for the full flow.
 
-15. what are the types of cacheing present ?
+15. what are the types of cacheing present ? What are the cache Eviction policies ?
    Hint: Client/browser, CDN, reverse-proxy, application (in-memory like Redis/Memcached), and database query cache — i.e. caching at every layer of the request path.
 
 16. What is 2 Phase commit in microservice ? How saga patten solves it ? What if compensating transation fails ?
@@ -63,4 +59,23 @@ What is diff between OIDC and Oauth2.0
 17. What is circuit breaker pattern ? Why do we need to implement resillience ?
    Hint: Stop calling a failing downstream service after N failures (open the circuit), serve a fallback, then probe to recover (half-open) — prevents cascading failures and lets the system stay responsive under partial outages.
 
-18.
+18. Where the messages are stored in kafka ? What would you do if memory gets full in kafka ?
+
+19. Which one is best practice and why ?
+cache.delete() -> database.delete()
+database.delete() -> cache.delete()
+What if one operation succeed and other fails (2PC)
+   Hint: delete from DB the process cache deletion in async way with retry
+
+20. What is the use of webhooks ? How this is different from Rest API ?
+
+21. Your user data has grown to 100M+ now you decided to Distributed it into multiple servers. You have created 26 servers and stored data like A in server B next server and so on ...
+what are the pros anc cons ?
+
+22. Docker: Different between containers and vistual machines ?
+
+23. A user's account is suspended, but their JWT is still valid for 12 more hours. They are still able to access the system. How would you block access immediately ? 
+
+24. Your application is working fine all day but crashes every night at 2AM at production, at 2AM the traffic is low then why it crashes, how would you debug this ?
+
+25. Difference between virtual machines and containers 

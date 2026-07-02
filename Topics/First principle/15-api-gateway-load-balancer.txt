@@ -1,4 +1,5 @@
-======================== Load Balancer ========================
+━━━━━━━━━━━━━━━ ⚖️ Load Balancer ━━━━━━━━━━━━━━━
+
 Load Balancer
 Distributes traffic
 It does NOT understand business intent.
@@ -21,7 +22,8 @@ Example:
 
 This slightly narrows the gap between load balancers and API gateways.
 
-======================== Internal Load Balancer ========================
+━━━━━━━━━━━━━━━ 🔀 Internal Load Balancer ━━━━━━━━━━━━━━━
+
 Used for:
 East-West traffic
 traffic between internal services.
@@ -40,7 +42,8 @@ Example:
 Scale Order Service only
 without scaling everything else.
 
-======================== API Gateway ========================
+━━━━━━━━━━━━━━━ 🚪 API Gateway ━━━━━━━━━━━━━━━
+
 Governs traffic
 while load balancer mainly:
 Moves traffic
@@ -85,7 +88,7 @@ They act as:
 First security shield
 against malicious traffic.
 
-======================== When to Use Only Load Balancer ========================
+━━━━━━━━━━━━━━━ ✅ When to Use Only Load Balancer ━━━━━━━━━━━━━━━
 
 Good enough for:
 internal traffic only
@@ -93,7 +96,8 @@ simple architectures
 early-stage startups
 limited public APIs
 
-======================== When API Gateway is Required ========================
+━━━━━━━━━━━━━━━ 🚪 When API Gateway is Required ━━━━━━━━━━━━━━━
+
 Use API Gateway when you need:
 
 public APIs
@@ -102,7 +106,8 @@ rate limiting
 partner integrations
 centralized governance
 API versioning
-======================== Do NOT Use API Gateway Internally Everywhere ========================
+
+━━━━━━━━━━━━━━━ ⚠️ Do NOT Use API Gateway Internally Everywhere ━━━━━━━━━━━━━━━
 
 Problems:
 extra latency
@@ -113,7 +118,7 @@ Better options:
 service mesh
 internal load balancing
 
-======================== API Gateway Drawbacks ========================
+━━━━━━━━━━━━━━━ 🛑 API Gateway Drawbacks ━━━━━━━━━━━━━━━
 
 If poorly designed:
 Gateway becomes single point of failure
@@ -136,7 +141,7 @@ Grafana
 Elasticsearch
 Jaeger
 
-======================== Managed vs Self-Hosted API Gateways ========================
+━━━━━━━━━━━━━━━ 🏗️ Managed vs Self-Hosted API Gateways ━━━━━━━━━━━━━━━
 
 Managed gateways:
 easy initially

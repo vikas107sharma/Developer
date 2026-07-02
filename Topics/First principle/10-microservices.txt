@@ -4,7 +4,7 @@ A monolith keeps all modules inside a single application.
 Orders + Payments + Notifications + Auth
 run and deploy together.
 
-Advantages
+🔹 Advantages
 Single deployment
 Easier local development and debugging
 Simple communication between modules (function calls)
@@ -16,7 +16,7 @@ Internal calls are simple:
 function calls
 instead of network calls.
 
-Drawbacks of Monoliths
+🔹 Drawbacks of Monoliths
 1. Deployment Dependencies
 Even a small change requires redeploying the entire application.
 
@@ -35,7 +35,7 @@ multithreading → Go
 CSV/Excel processing → Python
 Monolith forces everything into one stack.
 
-======================== Drawbacks of Microservices ========================
+━━━━━━━━━━━━━━━ 🧩 Drawbacks of Microservices ━━━━━━━━━━━━━━━
 1. Network Overhead
 Internal function calls become network calls.
 Orders Service -> Payments Service
@@ -83,7 +83,7 @@ machine size
 Choosing the correct machine size is difficult because traffic changes over time.
 
 Normal traffic vs sale traffic
-Auto Scaling
+🔹 Auto Scaling
 One solution is auto scaling.
 
 Problem
@@ -98,7 +98,7 @@ dependency initialization
 
 During sudden traffic spikes, requests may fail before new servers become ready.
 
-======================== Serverless ========================
+━━━━━━━━━━━━━━━ ☁️ Serverless ━━━━━━━━━━━━━━━
 
 In serverless architecture:
 developers only provide code
