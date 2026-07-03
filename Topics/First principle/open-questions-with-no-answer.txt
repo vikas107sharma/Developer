@@ -1,4 +1,6 @@
-✅✅ Open Questions ✅✅
+✅✅ Open Questions — Grouped by Topic ✅✅
+
+━━━━━━━━━━━━━━━ 🔐 Authentication & Security ━━━━━━━━━━━━━━━
 
 1. If a user enters the wrong password, what error message does the backend send and what message does the user see?
    Hint: Always send a generic "Invalid email or password" — never reveal which one was wrong (avoids user enumeration).
@@ -13,69 +15,456 @@
    -> Timing attack.
    Hint: Existing users take longer (hash is actually computed) vs non-existing ones — fix with constant-time responses (always run a dummy hash even when the user doesn't exist).
 
-4. What is a write-ahead log (WAL)?
-   Hint: Changes are written to an append-only log on disk BEFORE touching the actual data pages — so on a crash the DB can replay the log to recover (durability).
-
-5. You have 10 min delivery app, what would choose for creating live order update module which shows live status to user
-What would you choose websockets or SSE
-   Hint: SSE — updates are server -> client only (one-way), lighter than websockets, and auto-reconnects; full duplex of websockets is overkill here.
-
-6. How indexing works in DB
-Suppose there are two tables. In the first table, the indexed column is an auto-increment ID (or sequence number). In the second table, the indexed column is age, which can have random values. Why are inserts generally faster in the first table than in the second?
-   Hint: B-tree indexes append sequentially for auto-increment (always at the right edge), but random values cause page splits and random I/O scattered across the tree.
-
-7. Suppose you load has been increased and now you have decided to spin up more servers, how will you decide which request goes to which server ?
-   Hint: A load balancer using a strategy — round robin / least connections, or consistent hashing when you need session/cache affinity (sticky sessions).
-
-8. What is 2PC and what problem of 2PC the saga pattern solves ?
-   Hint: 2PC = coordinator does prepare -> commit across services but holds locks and blocks if coordinator dies; saga replaces it with local commits + compensating transactions (no global locks, eventual consistency).
-
-9. What is thundering herd problem ?
-   Hint: A cache key expires and thousands of requests simultaneously hit the DB to rebuild it — solved with locking/single-flight, request coalescing, or staggered TTLs.
-
-10. Your app is slow , do you reduce latency or increase throughput ?
-   Hint: Depends — if a single request feels slow, reduce latency; if the system chokes under load, increase throughput. Measure first (where is the bottleneck).
-
-11. What is connection pooling, how will you decide the correct pool size.
-   Hint: Reuse a fixed set of DB connections instead of opening new ones each time; size is bounded by the DB's max connections (a common starting point: cores * 2 + effective spindles), tune via load testing.
-
-12. What do you think which one is better single threaded or multi threaded programming languages ?
-What is GIL ? If GIL is limiting python to single threaded, then what is the purpose of keeping GIL.
-   Hint: Neither is universally better — single-threaded (event loop) wins for I/O-bound, multi-threaded for CPU-bound. GIL = one lock letting only one thread run Python bytecode at a time; it's kept to make memory management (reference counting) safe and simple — use multiprocessing for CPU-bound work.
-
-13. How memory management works in python (Garbage collector, Reference counter)
-   Hint: Primary mechanism is reference counting (object freed when refcount hits 0); a cyclic garbage collector runs additionally to clean up reference cycles that refcounting alone can't free.
-
-14. What are the problems which Oauth2.0 solves ? Is this Authentication or Authorization ? How do you implement Oauth2.0 ?
-What is diff between OIDC and Oauth2.0
+4. What are the problems which OAuth2.0 solves? Is this Authentication or Authorization? How do you implement OAuth2.0?
+   What is the diff between OIDC and OAuth2.0?
    Hint: OAuth2.0 = delegated AUTHORIZATION (let an app access your data without sharing your password); OIDC adds AUTHENTICATION on top via an id_token (JWT) that proves identity. See the answered file for the full flow.
 
-15. what are the types of cacheing present ? What are the cache Eviction policies ?
-   Hint: Client/browser, CDN, reverse-proxy, application (in-memory like Redis/Memcached), and database query cache — i.e. caching at every layer of the request path.
+5. A user's account is suspended, but their JWT is still valid for 12 more hours. They are still able to access the system. How would you block access immediately?
+   Hint: Stateless JWTs can't be recalled — add a small server-side check: a Redis denylist of revoked jti/userIds (checked on every request), or a tokenVersion column on the user that is also embedded in the JWT — bump it on suspension so old tokens fail the compare. Alternative: short-lived access tokens (5–15 min) + refresh tokens, and revoke the refresh token.
 
-16. What is 2 Phase commit in microservice ? How saga patten solves it ? What if compensating transation fails ?
-   Hint: Same as Q8; if a compensating transaction fails, you retry it (must be idempotent) and if it still fails, escalate via dead-letter queue / manual intervention — you can't just abandon it.
+6. Your database containing bcrypt hashes, salts, and user emails is leaked, but your application servers are not compromised.
+   What can the attacker do? What can't they do? How does pepper change the attack?
+   Hint: They CAN run offline dictionary attacks per user (salt is in the dump) — weak passwords will fall, slowly, because bcrypt is expensive. They CANNOT reverse the hashes or crack strong passwords economically. A pepper (secret kept on the app server / KMS, NOT in the DB) makes offline cracking impossible without also compromising the servers.
 
-17. What is circuit breaker pattern ? Why do we need to implement resillience ?
+7. Your JWT expires after 24 hours. A user changes their password.
+   How do you immediately invalidate every active JWT without keeping server-side session state?
+   Hint: Store passwordChangedAt (or tokenVersion) on the user record; JWTs carry iat (issued-at). On each request: if token.iat < passwordChangedAt → reject. It's a user-record lookup, not session state.
+
+8. You have 10 API servers. How would you implement logout from all devices?
+   Hint: Same tokenVersion trick — bump the user's tokenVersion; all 10 servers do the same compare. Or a shared Redis denylist keyed by userId with TTL = remaining token lifetime, checked by every server.
+
+9. Why shouldn't you encrypt passwords instead of hashing them?
+   Hint: Encryption is reversible — whoever steals the key gets ALL plaintext passwords. Hashing is one-way; you never need the original password, only to verify a match.
+
+10. JWT is signed but not encrypted. What information can an attacker still read?
+   Hint: The whole payload — it's just base64 (userId, email, roles, expiry). Signing only prevents tampering, not reading. Never put secrets/PII you don't want exposed in a JWT.
+
+11. If HttpOnly cookies prevent XSS from stealing cookies, why is XSS still dangerous?
+   Hint: The injected script runs AS the user in their browser — it can make authenticated API calls (the cookie is auto-attached), change the password/email, exfiltrate page data, keylog, deface the UI. It doesn't need to read the cookie to abuse the session.
+
+12. If JWTs are stateless, how do large companies revoke millions of tokens instantly?
+   Hint: Keep access tokens very short-lived (minutes) so "revocation" = just stop issuing; real revocation happens on the refresh token, which IS checked against a central store. For instant kill: rotate the signing key (invalidates everything) or a Redis denylist.
+
+13. How would you protect a login API against: brute force, credential stuffing, bot attacks, enumeration attacks?
+   Hint: Rate limit per-IP AND per-account, progressive delays / CAPTCHA after N failures, generic error messages + constant-time responses (anti-enumeration), check against breached-password lists, device fingerprinting / WAF for bots, alert + temporary lock on distributed patterns.
+
+14. Would you store permissions: inside JWT, Redis, or database? Why?
+   Hint: Coarse, rarely-changing roles → in the JWT (no lookup). Fine-grained / frequently-changing permissions → Redis (fast, centrally updatable) backed by DB as source of truth. A JWT can't be updated until it's reissued — anything that must change instantly can't live only there.
+
+━━━━━━━━━━━━━━━ ⚡ Caching ━━━━━━━━━━━━━━━
+
+1. What are the types of caching present? What are the cache eviction policies?
+   Hint: Layers: client/browser, CDN, reverse-proxy, application (in-memory like Redis/Memcached), and database query cache — caching at every hop of the request path. Eviction policies: LRU (least recently used), LFU (least frequently used), FIFO, TTL-based expiry, random.
+
+2. What is the thundering herd problem?
+   Hint: A cache key expires and thousands of requests simultaneously hit the DB to rebuild it — solved with locking/single-flight, request coalescing, or staggered TTLs.
+
+3. Which one is best practice and why?
+   cache.delete() -> database.delete()
+   database.delete() -> cache.delete()
+   What if one operation succeeds and the other fails (2PC)?
+   Hint: Delete from DB first, then process cache deletion in an async way with retry.
+
+4. You cache product data in Redis. Product price changes. 50,000 users request the same product simultaneously.
+   How do you prevent all requests from hitting MySQL after cache invalidation?
+   Hint: Cache stampede — use single-flight: the first miss takes a mutex/lock and rebuilds; the other 49,999 wait on the lock (or briefly serve the stale value: stale-while-revalidate). Request coalescing at the app layer achieves the same.
+
+5. Redis goes down. Should your application: fail, bypass cache, or return stale data? Explain the trade-offs.
+   Hint: Usually bypass cache — but behind a circuit breaker + rate limit so the DB isn't stampeded (a cold DB can't absorb 100% of cached traffic). Fail = safest for the DB, worst UX. Stale data needs a second cache layer (local in-process) to even be possible. Decide per feature; know the answer BEFORE the outage.
+
+6. Your cache hit ratio suddenly drops from 95% to 40%. What are the first things you would investigate?
+   Hint: A deploy that changed key names/TTLs, Redis eviction due to maxmemory (check evicted_keys), a Redis restart/flush (cold cache), a traffic shift to uncached long-tail keys, key-cardinality explosion (e.g. userId accidentally in the key).
+
+7. Redis is faster than MySQL. Why shouldn't you cache everything?
+   Hint: RAM is expensive and finite; every cached item adds invalidation complexity and a staleness window; write-heavy or rarely-read data has a low hit ratio (cost without benefit). Cache what is read-heavy, expensive to compute, and tolerant of slight staleness.
+
+8. Your cache TTL is 1 hour. A bug corrupts cached data. How do you invalidate millions of keys immediately?
+   Hint: Version the keys — a global/namespace version prefix (product:v42:{id}); bump v42→v43 and every old key is instantly unreachable (expires naturally later). Avoid FLUSHALL/mass DELETE — it stampedes the DB.
+
+9. Can increasing cache size ever decrease performance?
+   Hint: Yes — an in-process cache that outgrows the heap causes GC pauses; Redis exceeding RAM starts swapping (catastrophic); a bigger keyspace holds more stale entries and slows eviction scans.
+
+10. Your cache hit ratio is 99%. Database CPU is still 95%. How?
+   Hint: The 1% misses may be the most expensive queries; caching only covers reads — writes still hit the DB; or the ratio is measured per-key while the query volume is dominated by uncached paths (analytics, background jobs).
+
+11. Your cache has 99% hit ratio. Why are users still seeing slow responses?
+   Hint: A cache hit doesn't make the whole request fast — look at N+1 cache calls (100 round trips per request), huge payloads/serialization, slow app code after the hit, network/TLS, or the latency living in a different dependency entirely. Trace one slow request.
+
+12. Where would you cache first? Browser, CDN, API Gateway, Redis, Local memory. Explain the order.
+   Hint: As close to the user as possible: browser (zero network) → CDN (static + cacheable API responses at the edge) → gateway (shared, cross-service) → Redis (shared, dynamic data) → local memory (fastest but per-instance, inconsistent across nodes). Each hop absorbed = everything behind it spared.
+
+13. Two services cache the same data. Who owns cache invalidation?
+   Hint: The service that OWNS the data publishes a change event (e.g. product.updated); every service that caches it subscribes and invalidates its own copy. Owners never reach into someone else's cache.
+
+14. How do you update cache without causing stale reads?
+   Hint: Cache-aside with delete-on-write (write DB → delete key → next read repopulates) plus a short TTL as a safety net; or versioned keys so readers atomically switch to the new version. Never write cache-then-DB — a failed DB write leaves a permanently wrong cache.
+
+━━━━━━━━━━━━━━━ 🗄️ Databases & Indexing ━━━━━━━━━━━━━━━
+
+1. What is a write-ahead log (WAL)?
+   Hint: Changes are written to an append-only log on disk BEFORE touching the actual data pages — so on a crash the DB can replay the log to recover (durability).
+
+2. How does indexing work in a DB?
+   Suppose there are two tables. In the first table, the indexed column is an auto-increment ID (or sequence number). In the second table, the indexed column is age, which can have random values. Why are inserts generally faster in the first table than in the second?
+   Hint: B-tree indexes append sequentially for auto-increment (always at the right edge), but random values cause page splits and random I/O scattered across the tree.
+
+3. A query became slow overnight. Nothing changed in application code. What could have happened?
+   Hint: The optimizer picked a new plan (stale statistics after data growth), the working set outgrew the buffer pool, an index got dropped/bloated, autovacuum/analyze fell behind, or a noisy neighbor is eating disk I/O. Compare EXPLAIN now vs the old plan.
+
+4. You added an index. Reads became faster. Writes became 40% slower. Why?
+   Hint: Every INSERT/UPDATE/DELETE must now also update the index B-tree — extra page writes, page splits, and WAL volume. Each additional index is a tax on every write.
+
+5. You shard by user_id. Now you need: SELECT * FROM orders WHERE created_at > NOW() - INTERVAL 1 DAY;
+   What problem occurs?
+   Hint: The query has no shard key, so it must scatter-gather: fan out to ALL shards, run everywhere, merge results — slow and expensive. Fix by maintaining a separate time-indexed view / analytics store (CDC into a warehouse), not by querying shards directly.
+
+6. Your replicas have a 500ms lag. A customer updates shipping address and refreshes immediately. How would you guarantee they see fresh data?
+   Hint: Read-your-own-writes: route THAT user's reads to the primary for a few seconds after a write (sticky flag in session/cookie), or track the write's LSN/GTID and only read from a replica that has caught up to it.
+
+7. Your query uses an index. Why might MySQL still choose a full table scan?
+   Hint: Low selectivity — if the predicate matches a large fraction of rows, sequential scan is cheaper than millions of random index lookups. Also: stale statistics, or a function/type-cast on the column disabling the index.
+
+8. A covering index exists. Why might the optimizer still ignore it?
+   Hint: Stale/misleading statistics, low selectivity making the scan look cheaper, the index column order not matching the WHERE/ORDER BY, or a collation/type mismatch. Run EXPLAIN and ANALYZE the table first.
+
+9. Why does LIMIT 100000,20 become slower and slower?
+   Hint: OFFSET doesn't skip — the DB reads and discards 100,000 rows every time. Use keyset (cursor) pagination instead: WHERE id > :last_seen_id ORDER BY id LIMIT 20 — constant cost at any depth.
+
+10. Your table has 2 billion rows. Deleting 500 million rows is causing production issues. How would you remove them safely?
+   Hint: Batch it — loop DELETE ... LIMIT 10000 with pauses (bounded locks, bounded WAL, replicas keep up). Even better: if the data is partitioned by the delete key, DROP PARTITION is instant. Or copy the rows you KEEP into a new table and rename-swap.
+
+11. Your UPDATE touches 20 million rows. Why can this affect completely unrelated queries?
+   Hint: One giant transaction holds locks for its whole duration, floods the WAL/undo (replication lag for everyone), and evicts hot pages from the buffer pool while saturating disk I/O — unrelated queries suffer lock waits and cold-cache reads. Batch it.
+
+12. Your query takes 2 seconds. How do you determine whether the bottleneck is: SQL execution, network, serialization, application code, connection pool, logging?
+   Hint: Measure each layer instead of guessing: EXPLAIN ANALYZE / slow-query log gives pure SQL time; APM spans (or timers around the call) split app vs DB; pool wait metrics reveal queueing before the query even runs; payload size hints at serialization. Subtract inward: total − SQL − pool wait = app + network.
+
+13. You can add either: one index, or a Redis cache. Which do you choose first?
+   Hint: The index — it fixes the root cause for ALL readers, costs nothing to keep consistent, and has no invalidation logic. Cache only after the query is already as cheap as it can be (or is genuinely expensive by nature, e.g. aggregations).
+
+14. Why can an index make a query slower?
+   Hint: A non-covering index on a low-selectivity predicate forces millions of random-I/O row lookups — worse than one sequential scan. The optimizer can also be lured into a bad plan by a misleading index. And every index slows writes.
+
+15. Your table has 5 billion rows. Would you: partition, shard, archive, add indexes? How do you decide?
+   Hint: Decide by access pattern. Archive first if most data is cold (cheapest win). Partition if queries hit a natural slice (recent dates) — enables pruning and instant drops. Index if specific queries are slow, not size itself. Shard LAST — only when one machine truly can't hold the write/storage load; it's the most expensive to operate.
+
+16. Would you ever intentionally remove an index?
+   Hint: Yes — unused indexes (check index-usage stats) pay the write tax and disk cost for zero reads; also redundant indexes where one is a prefix of another (a,b covers a).
+
+━━━━━━━━━━━━━━━ 🌐 Distributed Systems ━━━━━━━━━━━━━━━
+
+1. What is 2PC and what problem of 2PC does the saga pattern solve? What if a compensating transaction fails?
+   Hint: 2PC = coordinator does prepare -> commit across services but holds locks and blocks if the coordinator dies; saga replaces it with local commits + compensating transactions (no global locks, eventual consistency). If a compensating transaction fails, retry it (must be idempotent); if it still fails, escalate via dead-letter queue / manual intervention — you can't just abandon it.
+
+2. What is the circuit breaker pattern? Why do we need to implement resilience?
    Hint: Stop calling a failing downstream service after N failures (open the circuit), serve a fallback, then probe to recover (half-open) — prevents cascading failures and lets the system stay responsive under partial outages.
 
-18. Where the messages are stored in kafka ? What would you do if memory gets full in kafka ?
+3. Service A calls: Service B, Service C, Service D. B succeeds. C times out. D never receives the request. How do you recover?
+   Hint: This is exactly what a saga/orchestrator handles: retry C with an idempotency key (a timeout ≠ failure — C may have actually succeeded, so blind retry without idempotency double-executes), then D; if the flow must abort, run B's compensating action. Never treat timeout as "didn't happen".
 
-19. Which one is best practice and why ?
-cache.delete() -> database.delete()
-database.delete() -> cache.delete()
-What if one operation succeed and other fails (2PC)
-   Hint: delete from DB the process cache deletion in async way with retry
+4. Why is exactly-once delivery almost impossible in distributed systems?
+   Hint: The ack can be lost AFTER processing succeeded — the sender cannot distinguish "failed" from "succeeded but ack lost", so it must retry, producing duplicates. Practical answer: at-least-once delivery + idempotent consumers = effectively-once processing.
 
-20. What is the use of webhooks ? How this is different from Rest API ?
+5. Kafka guarantees ordering. Under what conditions does that guarantee break?
+   Hint: Ordering is per-PARTITION only. It breaks: across partitions, when the message key changes (routes to a different partition), when the topic is repartitioned, and with producer retries when max.in.flight.requests > 1 without idempotence enabled.
 
-21. Your user data has grown to 100M+ now you decided to Distributed it into multiple servers. You have created 26 servers and stored data like A in server B next server and so on ...
-what are the pros anc cons ?
+6. Two data centers become partitioned. Would you choose availability or consistency? Give an e-commerce example.
+   Hint: Per-feature, not per-system: browsing, search, cart → availability (stale product data is harmless). Checkout, payment, inventory decrement → consistency (better to reject an order than oversell or double-charge).
 
-22. Docker: Different between containers and vistual machines ?
+7. You have three replicas: Primary, Replica A, Replica B. Primary crashes immediately after acknowledging a write. Replica A has the write. Replica B doesn't. Which replica should become the new primary?
+   Hint: Replica A — promoting B silently loses an acknowledged write. This is why leader election (Raft etc.) only elects the candidate with the most up-to-date log, and why acks should require replication to a quorum before being sent.
 
-23. A user's account is suspended, but their JWT is still valid for 12 more hours. They are still able to access the system. How would you block access immediately ? 
+8. A network partition occurs. Both partitions elect themselves leader. How do databases avoid split-brain?
+   Hint: Quorum — a leader needs votes from a MAJORITY of nodes, and two disjoint majorities can't exist, so at most one side elects. Plus epochs/terms and fencing tokens so a stale ex-leader's writes are rejected.
 
-24. Your application is working fine all day but crashes every night at 2AM at production, at 2AM the traffic is low then why it crashes, how would you debug this ?
+9. Why can't distributed systems have a perfectly synchronized clock? How does this affect databases?
+   Hint: Every quartz clock drifts and NTP corrections travel over variable-latency networks — you only ever get a bounded uncertainty, never equality. So wall-clock timestamps can't safely order events across nodes; DBs use logical clocks (Lamport/vector) or bounded-uncertainty tricks (Spanner TrueTime waits out the uncertainty). Last-write-wins on wall clocks silently loses data.
 
-25. Difference between virtual machines and containers 
+10. If every service retries automatically after timeout, how can retries make an outage worse?
+   Hint: Retry storm — a struggling service now gets N× its normal traffic from retries, guaranteeing it stays down; retries also multiply through the call chain (3 retries at 3 layers = 27×). Fix: exponential backoff + jitter, retry budgets, circuit breakers.
+
+11. When should you fail fast instead of retrying?
+   Hint: When the operation is non-idempotent (payments) — a timeout might have succeeded; when the error is non-transient (400, auth failure — retrying can't help); when the circuit is open / downstream is known-down; and when the user is waiting and your latency budget is spent — return an error, don't queue pain.
+
+━━━━━━━━━━━━━━━ 🧩 Microservices ━━━━━━━━━━━━━━━
+
+1. Order Service needs user name. Would you: call User Service every request, duplicate data, cache it, or use events? Explain your reasoning.
+   Hint: Duplicate it via events (Order Service keeps its own user-name copy, updated by user.updated events) — names change rarely, reads are constant, and this removes the runtime dependency entirely. Per-request sync calls couple your availability to User Service; a cache is the middle option but still needs invalidation = the same events anyway.
+
+2. One service is deployed with a breaking API change. Half the services still use the old API. How would you deploy safely?
+   Hint: Never deploy a break — use expand-and-contract: (1) EXPAND: add the new endpoint/fields alongside the old, (2) MIGRATE consumers one by one, (3) CONTRACT: remove the old only when metrics show zero callers. Version the API (/v2) if the shapes truly can't coexist.
+
+3. Why is synchronous communication between microservices dangerous?
+   Hint: Temporal coupling — both must be up at the same moment; availabilities multiply (five 99.9% hops ≈ 99.5%); latencies add; and one slow dependency exhausts your thread/connection pools and cascades upstream. Use async events where you don't need the answer to respond.
+
+4. Would you allow Service A to directly query Service B's database? Why?
+   Hint: No — A now depends on B's private schema, so B can never refactor its tables without breaking A, and B's invariants/validation are bypassed. Go through B's API, or consume B's published events into A's own read model.
+
+5. Why is "shared database" usually considered an anti-pattern in microservices?
+   Hint: It recreates the monolith's coupling with the monolith's benefits removed: no clear data ownership, schema migrations need lockstep deploys across teams, one service's bad query hurts everyone, and independent scaling/deployment — the whole point — is gone.
+
+6. How do you version an event without breaking consumers?
+   Hint: Make only additive, backward-compatible changes (new OPTIONAL fields; never rename/remove/retype), enforced by a schema registry with compatibility checks. For a true break: publish v2 to a new topic, dual-publish during migration, retire v1 when consumer lag shows nobody's left.
+
+7. Should services share models?
+   Hint: Share CONTRACTS (event schemas, API DTOs — ideally generated from a schema registry/OpenAPI), never domain models. A shared domain-model library couples every service's internals and forces lockstep upgrades.
+
+8. Would you ever duplicate data between services?
+   Hint: Yes, deliberately — each service keeps its own read-optimized copy of other services' data, synced by events. You trade storage + eventual consistency for autonomy and no runtime dependency. The owning service stays the single source of truth.
+
+9. One microservice becomes unavailable. Should the whole request fail?
+   Hint: Only if that service is essential to the operation's correctness (payment during checkout: yes). Otherwise degrade gracefully — circuit breaker + fallback: skip recommendations, show cached data, hide the widget. Decide the criticality of every dependency in advance.
+
+━━━━━━━━━━━━━━━ 📨 Queues & Kafka ━━━━━━━━━━━━━━━
+
+1. Where are the messages stored in Kafka? What would you do if memory gets full in Kafka?
+   Hint: On DISK — each partition is an append-only log of segment files (Kafka relies on the OS page cache for speed, not on holding messages in RAM). "Full" is a disk problem: retention policies (time/size based) delete old segments automatically; if disk pressure persists — lower retention, enable compression, add brokers/partitions to spread data, or use tiered storage (old segments to S3).
+
+2. A worker crashes after charging the customer but before acknowledging the queue message. What happens next? How do you avoid charging twice?
+   Hint: The unacked message is redelivered to another worker → double-charge risk. Fix with idempotency: derive a charge idempotency key from the message/order id, record it (unique constraint) in the same transaction as the charge, and skip if already present. At-least-once delivery + idempotent processing.
+
+3. Queue size keeps increasing. Consumers are healthy. What could be wrong?
+   Hint: "Healthy" ≠ fast — consumers may be up but processing slower than producers publish (check per-message latency), a poison message may be failing + requeueing in a loop, messages may be skewed onto one partition, or a downstream dependency the consumers call is slow.
+
+4. Why is FIFO ordering difficult in distributed queues?
+   Hint: Parallelism destroys global order — multiple partitions/consumers process concurrently, and retries/redeliveries reinsert messages out of order. Strict global FIFO forces a single partition + single consumer = no parallelism. Practical answer: order only within a key (Kafka: same key → same partition).
+
+5. A queue has 5 partitions. One consumer group has 20 consumers. How many consumers are actually useful?
+   Hint: 5 — within a consumer group, a partition is assigned to at most one consumer, so 15 sit idle. Want more parallelism? Add partitions (or do parallel processing inside each consumer, at the cost of per-partition ordering).
+
+6. A consumer processes messages slower than producers generate them. What happens over several hours?
+   Hint: The backlog grows without bound — end-to-end latency climbs from seconds to hours, disk fills, and once retention limits hit, unprocessed messages get DELETED (silent data loss). Fix: scale consumers/partitions, batch processing, or shed/sample load.
+
+7. Dead-letter queue is filling rapidly. What does that tell you?
+   Hint: The failures are systematic, not transient (transient ones succeed on retry before DLQ): a bad deploy, a schema/format change producing poison messages, or a downstream dependency that's hard-down. Inspect a few DLQ messages — they share a cause. Alert on DLQ rate.
+
+8. Should payment happen before publishing an event? Or publish first?
+   Hint: Do the state change (payment/DB write) first, then publish — publishing first announces something that may never happen. The gap "charged but crashed before publish" is closed by the transactional outbox pattern: write the event into an outbox table in the SAME DB transaction, and a relay publishes it to the broker.
+
+9. Why shouldn't every operation become asynchronous?
+   Hint: Async trades immediate feedback for complexity: the user can't be told the result (was the order accepted?), errors surface far from their cause, debugging needs correlation ids, and you inherit eventual-consistency UX everywhere. Keep sync where the caller needs the outcome to proceed (auth, validation, checkout confirmation).
+
+10. Queue latency is increasing. Consumers are idle. Why?
+   Hint: The work isn't reaching them: partition skew (hot key sends everything to one partition while others' consumers idle), a stuck rebalance / unassigned partitions, prefetch or visibility-timeout misconfiguration, or messages being published with a delay. Check per-partition lag, not just total lag.
+
+━━━━━━━━━━━━━━━ 🧵 Concurrency & Language Internals ━━━━━━━━━━━━━━━
+
+1. Which one do you think is better: single-threaded or multi-threaded programming languages?
+   What is GIL? If GIL is limiting Python to single-threaded, then what is the purpose of keeping GIL?
+   Hint: Neither is universally better — single-threaded (event loop) wins for I/O-bound, multi-threaded for CPU-bound. GIL = one lock letting only one thread run Python bytecode at a time; it's kept to make memory management (reference counting) safe and simple — use multiprocessing for CPU-bound work.
+
+2. How does memory management work in Python (Garbage collector, Reference counter)?
+   Hint: Primary mechanism is reference counting (object freed when refcount hits 0); a cyclic garbage collector runs additionally to clean up reference cycles that refcounting alone can't free.
+
+3. Node.js is single-threaded. How can two concurrent requests still corrupt shared state?
+   Hint: Interleaving at await points — request 1 reads shared state, awaits (yields the event loop), request 2 reads the SAME old value and writes, then request 1 resumes and overwrites. Any read-modify-write that spans an async boundary is a race, no threads required.
+
+4. Your async function contains: balance = balance - amount; No database. No await. Can a race condition still happen? Why?
+   Hint: Within one Node process, no — synchronous code between awaits runs atomically (nothing can interleave mid-statement). The race appears the moment (a) the read and write get separated by ANY async gap, or (b) you run multiple processes/instances (cluster, pods) — each has its own copy of balance, so shared state must move to a DB/Redis with atomic ops anyway.
+
+5. Why is locking an entire table almost always a bad idea?
+   Hint: It serializes ALL access — every reader and writer queues behind one operation, throughput collapses, timeouts and deadlocks spread, and replication stalls. Lock the smallest thing that protects the invariant: a row (SELECT ... FOR UPDATE) or use atomic conditional updates.
+
+6. Two users buy the last product simultaneously. Without using distributed locks, how can the database itself prevent overselling?
+   Hint: One atomic conditional write: UPDATE products SET stock = stock - 1 WHERE id = ? AND stock > 0 — then check affected-rows: 1 = you got it, 0 = sold out. The row lock inside the UPDATE serializes the two buyers; a CHECK constraint (stock >= 0) is the backstop.
+
+7. Optimistic locking vs pessimistic locking. When does each fail?
+   Hint: Optimistic (version column, retry on conflict) fails under HIGH contention — everyone conflicts, retries storm, little real progress. Pessimistic (lock up front) fails with long transactions / high scale — lock waits, deadlocks, and blocked queues; and it doesn't reach across service boundaries. Rule of thumb: optimistic for rare conflicts, pessimistic for hot rows.
+
+━━━━━━━━━━━━━━━ ⚖️ Load Balancing ━━━━━━━━━━━━━━━
+
+1. Suppose your load has increased and you have decided to spin up more servers. How will you decide which request goes to which server?
+   Hint: A load balancer using a strategy — round robin / least connections, or consistent hashing when you need session/cache affinity (sticky sessions).
+
+2. Least Connections is usually better than Round Robin. Give a scenario where Round Robin actually performs better.
+   Hint: Long-lived idle connections (websockets, keep-alive) — connection COUNT stops correlating with actual load, so Least Connections misroutes; with uniform short requests and identical servers, Round Robin distributes perfectly and is simpler/cheaper.
+
+3. You have sticky sessions. One server becomes overloaded. How do you rebalance without logging users out?
+   Hint: The real fix is removing the need for stickiness: externalize session state to Redis so ANY server can serve any user, then rebalance freely. Short-term: drain the hot server gradually (stop NEW sessions to it, let existing ones expire) or use consistent-hash stickiness so only a slice of users remap.
+
+4. A server passes health checks but requests take 20 seconds. Should traffic still go there?
+   Hint: No — the health check is too shallow (TCP/ping says "alive", not "useful"). Use deep health checks that exercise real dependencies, latency-aware balancing, and outlier ejection (auto-remove nodes whose latency/error rate deviates from the pool).
+
+5. Can least-connections become worse than round-robin? Give an example.
+   Hint: Yes — the black-hole effect: a broken server that fails REQUESTS instantly always has the fewest open connections, so least-connections sends it MORE traffic, fast-failing everything. Guard with error-rate-based ejection alongside the connection count.
+
+━━━━━━━━━━━━━━━ 📈 Scaling ━━━━━━━━━━━━━━━
+
+1. Your app is slow. Do you reduce latency or increase throughput?
+   Hint: Depends — if a single request feels slow, reduce latency; if the system chokes under load, increase throughput. Measure first (where is the bottleneck).
+
+2. What is connection pooling? How will you decide the correct pool size?
+   Hint: Reuse a fixed set of DB connections instead of opening new ones each time; size is bounded by the DB's max connections (a common starting point: cores * 2 + effective spindles), tune via load testing.
+
+3. Traffic suddenly increases 100× in 30 seconds. Auto-scaling exists. Users still experience failures. Why?
+   Hint: Auto-scaling reacts in MINUTES (metric lag + instance boot + warm-up) — the 30-second spike is over before capacity arrives; and the DB/connection limits don't autoscale at all. Survive spikes with pre-provisioned headroom, a queue/waiting room to buffer, and load shedding.
+
+4. Your database CPU is only 20%. Queries are still taking 2 seconds. How is that possible?
+   Hint: The time is spent WAITING, not computing: disk I/O, row-lock contention, connection-pool queueing (query hasn't even started), or network. Check wait events / lock stats, not CPU.
+
+5. Your application scales perfectly. Database doesn't. Which layer do you scale next?
+   Hint: In order of cost: cache (absorb reads) → read replicas (spread reads) → partition/archive (shrink the working set) → shard (spread writes — last resort, hardest to run).
+
+6. Adding more servers makes the application slower. How is that possible?
+   Hint: Each new server multiplies pressure on the shared bottleneck — more DB connections, more lock contention — and dilutes per-node local caches (hit ratio drops, so MORE DB traffic). Horizontal scaling only helps when the bottleneck is the app tier itself.
+
+7. When does vertical scaling outperform horizontal scaling?
+   Hint: When the workload can't be split: a single-writer database, anything needing shared memory / low-latency coordination, strongly ordered processing. One big box has zero coordination overhead — often the right call until you truly exhaust hardware.
+
+8. You can upgrade: CPU, database, Redis, network bandwidth. How do you know which one matters?
+   Hint: Measure saturation, don't guess — the USE method per resource (Utilization, Saturation, Errors) plus request tracing to see where time is actually spent. Upgrade the resource that is saturated on the critical path; upgrading anything else buys nothing.
+
+9. Auto-scaling keeps adding servers. Latency still increases. Why?
+   Hint: The bottleneck is downstream of the app tier (DB, third-party API) — every added server just hammers it harder, and each new instance opens its own DB connections, making it WORSE. Scale the constraint, not the tier in front of it.
+
+10. Your application has 100 servers. One server receives 50% of traffic. Possible reasons?
+   Hint: Sticky sessions concentrating heavy users, a hot key in consistent hashing, LB weight misconfiguration, DNS caching pinning big clients to one IP, or the other 99 flapping health checks so the LB routes around them.
+
+━━━━━━━━━━━━━━━ 🔌 API Design & Communication ━━━━━━━━━━━━━━━
+
+1. You have a 10-min delivery app. What would you choose for creating a live order update module which shows live status to the user — websockets or SSE?
+   Hint: SSE — updates are server -> client only (one-way), lighter than websockets, and auto-reconnects; full duplex of websockets is overkill here.
+
+2. What is the use of webhooks? How is this different from a REST API?
+   Hint: Direction reversal — instead of you POLLING their REST API ("anything new?"), the provider CALLS your endpoint the moment an event happens (push). Cheaper and realtime, but now you must expose a public URL, verify signatures (anyone can POST to it), handle retries, and dedupe (webhooks arrive at-least-once).
+
+3. Should payment APIs be: PUT, POST, PATCH? Explain using idempotency.
+   Hint: POST + a client-generated Idempotency-Key header. POST isn't idempotent by spec (that's exactly why the key is needed — retries must not re-charge); PUT is idempotent but means "replace resource at this URL", which is semantically wrong for creating a charge. The server stores key → result and replays the stored result on duplicates.
+
+4. A client sends the same payment request 20 times because of retries. How do you ensure payment happens only once?
+   Hint: Idempotency key — client generates a unique key per logical payment; server inserts it with a UNIQUE constraint before processing; duplicates hit the constraint and get the original stored response back. The constraint (not app-level checks) is what makes it race-proof.
+
+5. Would you make an order creation API synchronous or asynchronous? When would you choose each?
+   Hint: Hybrid is the usual answer: synchronously validate + persist the order and return its id (the user must know it was accepted), then do fulfillment/payment-capture/notifications async via events. Fully sync when the whole flow is fast; fully async (202 + status endpoint) when creation itself is heavy or a downstream is slow.
+
+6. Should an API return HTTP 200 when background processing hasn't finished?
+   Hint: No — return 202 Accepted with a job/resource id and a status URL to poll (or push completion via webhook/SSE). 200 claims the work is done; lying breaks client retry logic.
+
+7. When should an API return: 200, 202, 204, 409, 429?
+   Hint: 200 = done, here's the body. 202 = accepted, processing continues async. 204 = done, nothing to return (DELETE). 409 = conflict with current state (duplicate create, version clash in optimistic locking). 429 = rate limited, back off (send Retry-After).
+
+8. Would you paginate using: OFFSET, cursor, page number? Why?
+   Hint: Cursor (keyset) — WHERE sort_key > :cursor is O(1) at any depth and stable when rows are inserted/deleted mid-scroll. OFFSET re-reads and discards all skipped rows AND shifts items between pages. Page numbers are just OFFSET with nicer clothes — fine only for small, static datasets.
+
+9. Why are cursors difficult when sorting changes?
+   Hint: A cursor encodes a position IN a specific sort order ("after price=99, id=1042") — change the sort and that position is meaningless. So the cursor must carry the sort key(s) + a unique tiebreaker (id), and changing sort mid-pagination means starting over.
+
+━━━━━━━━━━━━━━━ 🍃 NoSQL & Sharding ━━━━━━━━━━━━━━━
+
+1. Your user data has grown to 100M+ and you decided to distribute it into multiple servers. You created 26 servers and stored data like: names starting with A in server 1, B in the next server, and so on. What are the pros and cons?
+   Hint: Pro: dead simple routing. Cons: names aren't uniform (S/M servers overloaded, X/Q nearly empty), hot spots can't be split, and adding a 27th server has no natural place — massive manual resharding. This is why real systems use hashing, and consistent hashing (with virtual nodes) so adding/removing servers moves only a small key range.
+
+2. Why can't MongoDB joins be as efficient as SQL joins?
+   Hint: In a sharded setup the two collections' matching documents live on DIFFERENT machines — a join becomes a network scatter-gather, not a local page read; and the engine is built around the assumption that related data is EMBEDDED in one document instead. SQL joins are fast because both tables sit on one node with co-located indexes.
+
+3. A shard becomes 95% full. Others are only 30%. How do you fix it without downtime?
+   Hint: Split the hot shard's range into smaller chunks and let the balancer migrate chunks to underloaded shards online (Mongo does live chunk migration). Long-term fix: the shard key was bad (monotonic/skewed) — choose a high-cardinality, evenly-distributed key, or use hashed sharding.
+
+4. Consistent hashing minimizes movement. Why doesn't it eliminate movement entirely?
+   Hint: Adding a node means it takes over a slice of the ring — the ~K/N keys in that slice MUST physically move to it, or it would own nothing. "Minimize" means only the affected range moves (vs modulo-hashing reshuffling nearly everything); zero movement would mean the new node stores nothing.
+
+━━━━━━━━━━━━━━━ 🐳 Docker / Infra ━━━━━━━━━━━━━━━
+
+1. Docker: Difference between containers and virtual machines?
+   Hint: Containers share the HOST kernel — isolation via namespaces + cgroups, image is MBs, starts in milliseconds, near-zero overhead. VMs virtualize hardware and run a FULL guest OS per instance — GBs, boots in minutes, but stronger isolation (own kernel). Rule: containers for app packaging/density; VMs for hard security boundaries or different OS kernels.
+
+━━━━━━━━━━━━━━━ 🚨 Production Debugging ━━━━━━━━━━━━━━━
+
+1. Your application works fine all day but crashes every night at 2AM in production. At 2AM the traffic is low — then why does it crash? How would you debug this?
+   Hint: Something SCHEDULED, not traffic: cron jobs, DB backups, log rotation, batch/report jobs, or another tenant's nightly job saturating shared disk/network. Also classic: a slow memory leak all day + a heavy nightly job delivering the final blow. Debug: list every cron/scheduled task around 2AM, overlay crash time on memory/IO graphs, capture a heap dump just before 2AM.
+
+2. Your system crashes every day at exactly 2 PM. How do you investigate?
+   Hint: Exact same-time = a scheduler or a daily traffic/business event (report job, partner sync, lunch-hour peak, a customer's daily bulk import). Correlate: crontabs, scheduled tasks, traffic-by-endpoint at 2PM vs 1PM, and arrange a heap/thread dump + verbose logging window at 1:55 PM daily until caught.
+
+3. CPU = 10%, RAM = 30%, DB = healthy. Users complain the API is slow. What would you investigate next?
+   Hint: Low utilization + slow = the time is spent WAITING: blocked event loop / thread pool, connection-pool queueing, slow third-party calls, GC pauses, DNS/network, lock contention. Stop staring at dashboards and TRACE one slow request end-to-end (APM/distributed tracing) — the span with the gap is your answer.
+
+4. Production is slow. Metrics show: CPU 20%, RAM 40%, DB healthy, Redis healthy. What next?
+   Hint: Same principle — resource metrics only show WORK, not WAITING. Check p95/p99 (averages hide it), pool wait times, external API latency, and event-loop/thread blockage; then trace individual slow requests to find which hop eats the time.
+
+5. Logs show nothing. Metrics show nothing. Users still complain. How do you debug?
+   Hint: Your telemetry has a blind spot — the problem is likely BEFORE your servers (DNS, CDN, TLS, ISP/geo-specific routing) or hidden by aggregation (p99 buried in averages, one endpoint/tenant averaged away). Add real-user monitoring (browser timings), reproduce from the user's network/region, and slice metrics by endpoint/region/tenant instead of global averages.
+
+6. A bug happens once every 3 days. How do you catch it?
+   Hint: You can't reproduce it — so instrument to catch it in the act: structured logs with correlation ids around the suspect area, capture full context (request, state, stack) on the error path, keep heap/core dumps on crash, and check for patterns (every ~3 days ≈ a counter overflow, cert/token expiry, log rotation, or memory creep between deploys). Widen retention so evidence survives until you look.
+
+7. Your system works perfectly in testing but fails only during production traffic. How would you systematically narrow down the bottleneck?
+   Hint: Binary-search the stack with evidence: (1) find WHAT degrades first (latency? errors? which endpoint?) from metrics percentiles, (2) trace slow requests to isolate the failing hop, (3) compare prod vs test deltas — data volume, cache state, traffic mix, connection counts, concurrency — and replicate THAT delta in a load test. It's almost always a dimension the test didn't reproduce.
+
+8. Everything works in staging. Production crashes only during flash sales. Why are load tests often unable to reproduce production failures?
+   Hint: Load tests simulate uniform, well-behaved traffic; production spikes are bursty, correlated (everyone hits the SAME product = hot key), arrive on cold caches, with real payload sizes, real third-party latencies, and real user retry behavior (users hammering refresh multiply load). Reproduce by testing the spike shape and the hot-key pattern, not just average RPS.
+
+9. You're given only this information: API latency increased from 100ms to 3s, CPU is low, memory is low, DB CPU is low, no deployments happened. What do you investigate?
+   Hint: Nothing you own changed → look at what changes by itself: an external/third-party dependency slowing down, DNS, network path, data crossing a threshold (a table/index outgrew memory, a hot key appeared), connection-pool exhaustion from a slow client, cert/token nearing expiry. Trace one request — find where the 2.9 seconds actually sit.
+
+━━━━━━━━━━━━━━━ 💥 Failure Scenarios ━━━━━━━━━━━━━━━
+
+1. Redis goes down. What's your application's behavior?
+   Hint: (See Caching #5 for trade-offs.) The point of the question: you should KNOW the answer per feature — sessions, rate limits, cache — before it happens. Best practice: bypass to DB behind a circuit breaker + load shedding for cache; fail closed for anything security-critical (rate limiting decisions).
+
+2. Kafka goes down. What breaks? What continues working?
+   Hint: Synchronous request/response paths keep working; everything event-driven stops flowing — notifications, async processing, data sync. The real question is the PRODUCERS: with a transactional outbox they buffer events in the DB and drain when Kafka returns (nothing lost); naive fire-and-forget producers silently drop events.
+
+3. Database becomes read-only. What features of your application still work?
+   Hint: All reads — browsing, search, viewing orders. All writes fail — signup, checkout, updates. Graceful degradation: detect read-only mode, show a banner, and queue non-critical writes for replay; never let a write-failure take down the read experience.
+
+4. S3 becomes unavailable. How do you degrade gracefully?
+   Hint: Reads: serve from CDN cache (most objects are already cached at the edge) + placeholder images for misses. Writes: accept uploads into a queue/temp storage and replay to S3 later, or return "upload delayed" instead of failing the whole request.
+
+5. DNS resolution starts taking 5 seconds. What symptoms will users observe?
+   Hint: Seemingly random slowness — the FIRST request to each host is +5s, then fast while the TTL-cached entry lives, then slow again; timeouts on services with short connection reuse. Internally, every service-to-service call with fresh connections suffers. It looks like "intermittent network flakiness" — which is why DNS is checked last but should be checked first.
+
+6. One third-party API becomes slow. How do you stop it from bringing down your entire application?
+   Hint: Aggressive TIMEOUTS (a slow dependency is worse than a dead one), circuit breaker to stop calling it while it's sick, a bulkhead (dedicated, small connection/thread pool so it can't exhaust shared pools), a fallback response, and move the call off the critical path (async/queue) wherever the user doesn't need its result immediately.
+
+━━━━━━━━━━━━━━━ 🏗️ Architecture & System Design ━━━━━━━━━━━━━━━
+
+1. Where does idempotency belong? API Gateway, Service, Database, Queue Consumer.
+   Hint: The GUARANTEE must live where the side effect happens: the service + a database unique constraint on the idempotency key (only the DB can win the race). Gateway dedupe is a best-effort optimization; queue consumers must ALSO be idempotent because delivery is at-least-once. Layers stack; the DB constraint is the floor.
+
+2. Should validation happen: frontend, API Gateway, backend, database? Why?
+   Hint: All four, each for a different job: frontend = instant UX feedback (trivially bypassable, never trust it), gateway = coarse cross-cutting checks (auth, rate limits, schema shape), backend = the AUTHORITATIVE business-rule validation, database constraints = the last line that holds even when app code has bugs.
+
+3. When should a service call another service synchronously? When should it publish an event?
+   Hint: Sync when you NEED the answer to proceed (check inventory before confirming checkout). Event when others merely need to REACT and you don't need their result (order placed → email, analytics, loyalty points). Litmus test: "can I finish my response without their reply?" — yes → event.
+
+4. Would you rather lose availability or consistency for a payment system? Why?
+   Hint: Consistency — reject/queue the payment rather than risk a double-charge or wrong balance. A declined transaction is a retry; an inconsistent ledger is an incident + lost trust + manual reconciliation.
+
+5. Same question for: Chat application, Instagram likes, Banking, Live cricket score.
+   Hint: Chat → availability (messages can arrive slightly out of order/late; losing send ability is worse). Likes → availability (a stale count is invisible). Banking → consistency (see above). Cricket score → availability (a score stale by 2s is fine; the page being down is not).
+
+6. When is a monolith actually a better choice than microservices?
+   Hint: Small team, early product still finding fit, unclear domain boundaries — a monolith gives one deploy, easy refactoring across boundaries, no distributed-systems tax (network failures, tracing, sagas). A well-modularized monolith can carry you far; split when TEAM scaling or independent-deploy pain is real, not before.
+
+7. Your CTO wants to split everything into microservices. Would you agree? Why or why not?
+   Hint: Push back on "everything" — microservices solve ORGANIZATIONAL scaling (many teams deploying independently), not performance, and they cost you distributed transactions, network failure modes, and observability overhead. Wrong boundaries = a distributed monolith: all the coupling plus network calls. Split only along proven domain seams where the pain exists.
+
+8. Where would you deliberately choose eventual consistency over strong consistency?
+   Hint: Wherever staleness-of-seconds is invisible to users: feeds, like/view counts, search indexes, analytics, notifications, recommendation data, cross-service read replicas. Keep strong consistency for money, inventory at checkout, and auth state.
+
+9. What is the hardest distributed systems problem you've learned so far, and how would you explain it to a junior engineer?
+   Hint: Open-ended — a strong pick: exactly-once is impossible (explain via the lost-ack story: "did my message fail, or did only the confirmation fail? You can't know — so we retry and make handlers idempotent"). Or consensus/split-brain explained with the two-generals story. The interviewer is testing whether you can compress a deep idea, not which one you pick.
+
+10. If you had unlimited budget, what would you still not scale horizontally?
+   Hint: Anything requiring a single point of agreement: the strongly-consistent write path (single-writer primary DB / global sequencer / lock service). Adding machines to a coordination problem adds coordination, not capacity — that's the essence of why sharding is hard.
+
+11. Which backend problems cannot be solved by adding more servers?
+   Hint: Hot keys / single-row contention, slow queries and bad data models (every server runs the same bad query), lock contention (more servers = more contention), speed of light (cross-region latency), and single-writer bottlenecks. Servers multiply throughput of parallelizable work only.
+
+12. What's the biggest bottleneck after the database is no longer the bottleneck?
+   Hint: Usually the network of synchronous inter-service calls and third-party dependencies (latency adds up hop by hop, availability multiplies down) — and after the technical ones, the organization itself: coordination between teams becomes the limiting factor.
+
+13. Which components should be stateful, and which must always remain stateless?
+   Hint: App/API servers stateless ALWAYS — that's what makes horizontal scaling and instant failover possible (any instance can serve any request, killable at will). State gets pushed to the few components built to hold it: databases, caches, queues, object storage. Rule: state is a liability — concentrate it where replication/backup already solve it.
+
+14. Design a notification system for 100 million notifications/day.
+    Discuss: queues, retries, idempotency, rate limiting, dead-letter queues, user preferences, push vs email, failure handling.
+    Hint: Skeleton: ingest API → check user preferences (filter BEFORE enqueueing) → Kafka topic per channel (push/email/SMS) → worker pools per channel with per-provider rate limiting → retries with exponential backoff + jitter → DLQ after N failures (alert + replay tooling). Idempotency key = notificationId, deduped at the worker so retries never double-send. Push is cheap/instant with fallback to email; batch digests for low-priority. 100M/day ≈ ~1.2k/sec average, expect 10x peaks — partition by userId for ordering per user.
+
+15. Design a backend for a flash sale where 10 million users try to buy the last 100 products simultaneously.
+    Avoid: overselling, database overload, duplicate payments, cache stampede.
+    Hint: Layers of defense: (1) waiting room / queue at the edge — admit only a few thousand into checkout, reject the rest early (10M can never all win 100 items); (2) stock pre-loaded in Redis, atomic DECR — negative result = sold out, instantly rejected without touching MySQL; (3) winners get a short-lived reservation, payment carries an idempotency key (no double charge on retry); (4) final decrement in DB with conditional UPDATE ... WHERE stock > 0 as source of truth; (5) static/cached product page from CDN so browsing traffic never reaches origin.
+
+16. Imagine you have to build Flipkart today from scratch. What are the first three engineering decisions that will have the biggest impact five years later? Why?
+    Hint: Pick decisions that are nearly impossible to reverse: (1) data model + service/domain boundaries (wrong boundaries haunt every future feature and force painful migrations), (2) an event-driven backbone with idempotency from day one (retrofitting exactly-once semantics onto a sync-only system is brutal), (3) observability + multi-tenancy/sharding strategy baked in early (you can't add tracing or reshard 5-year-old data cheaply). Framework/language choices matter far less — those are replaceable; data gravity is not.

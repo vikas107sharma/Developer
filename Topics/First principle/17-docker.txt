@@ -1,0 +1,380 @@
+━━━━━━━━━━━━━━━ 🐳 Images vs Containers ━━━━━━━━━━━━━━━
+
+IMAGES        - Read-only templates used to create containers (like blueprints).
+Image = built using docker build
+
+CONTAINERS    - Running instances of Docker images (like live processes).
+Container = created using docker run
+
+No — one container = one image.
+A container is always created from one specific image.
+You can't run multiple images inside one container.
+
+━━━━━━━━━━━━━━━ 🧩 Docker Components ━━━━━━━━━━━━━━━
+
+Docker Engine — core part that runs containers.
+Docker Images — blueprint for containers.
+Docker Containers — running instance of an image.
+Dockerfile — file containing instructions to build an image.
+Docker Hub — public registry for images.
+Docker Compose — tool to manage multi-container apps.
+
+━━━━━━━━━━━━━━━ 📊 Containers vs Virtual Machines ━━━━━━━━━━━━━━━
+
+| Docker (Containers)     | Virtual Machines            |
+| ----------------------- | --------------------------- |
+| Lightweight             | Heavy (full OS inside)      |
+| Shares host OS kernel   | Has own OS kernel           |
+| Fast start (seconds)    | Slow start (minutes)        |
+| Uses less resources     | Uses more CPU, RAM, Disk    |
+| Ideal for microservices | Ideal for full OS isolation |
+
+━━━━━━━━━━━━━━━ ⌨️ Common Commands ━━━━━━━━━━━━━━━
+
+docker build -f Dockerfile.dev -t node-app-dev .
+docker build -f Dockerfile.prod -t node-app-prod .
+docker run -d -p 3000:3000 node-app
+docker logs -f <container_id>
+
+Port mapping:
+docker run -p 8080:3000 my-app
+3000 → container port (your app is listening here inside container)
+8080 → host port (you access via localhost:8080 on your machine)
+
+docker ps and logs
+Flag	Description	Example
+-a	Show all containers (even stopped)	docker ps -a
+-f	Follow logs in real-time	docker logs -f my-container
+
+docker run
+Flag	Description	Example
+-d	Run container in background (detached)	docker run -d nginx
+-p	Map port (host:container)	docker run -p 8080:80 nginx
+-e	Set environment variable	-e NODE_ENV=production
+
+docker build
+Flag	Description	Example
+-f	Specify Dockerfile name	docker build -f Dockerfile.dev .
+-t	Tag the image with a name	docker build -t my-app .
+
+Command	One-Line Explanation
+docker pull <image>	Download image from registry.
+docker run <image>	Download (if not) and run. (docker pull + docker start)
+docker build -t <name> .	Build image from Dockerfile.
+docker images	List all images.
+docker run -d --name <container> <image>	Run container in background.
+docker ps	List running containers.
+docker ps -a	List all containers (running + stopped).
+docker stop <container>	Stop running container.
+docker start <container>	Start stopped container.
+docker rm <container>	Delete container.
+docker rmi <image>	Delete image.
+docker exec -it <container> bash	Enter running container terminal.
+docker logs <container>	View container logs.
+
+Networks:
+docker network create <name>	               - Create Docker network.
+docker network ls                              - show network
+docker network rm <network_name_or_id>         - remove network
+
+━━━━━━━━━━━━━━━ 📄 Dockerfile (basic) ━━━━━━━━━━━━━━━
+
+FROM node:18
+
+WORKDIR /app
+
+COPY . ./
+
+RUN npm install
+
+CMD [ "node", "index.js" ]
+
+━━━━━━━━━━━━━━━ ⚡ Dockerfile (optimized — layer caching) ━━━━━━━━━━━━━━━
+
+FROM node:18-alpine
+
+# WORKDIR /app is like typing cd /app
+WORKDIR /app
+
+# The "./" refers to the current WORKDIR (/app)
+COPY package.json ./
+COPY package-lock.json ./
+
+# Install dependencies inside /app
+# Copy packages and install it first for layered caching so that whenever your code changes and you rebuild the image these are directly used from cache (previous layers)
+# But when there is any change in package.json then it will run again
+# Docker layer caching is a mechanism that reuses the results of previous builds to accelerate the creation of Docker images. Each instruction in a Dockerfile (such as RUN, COPY, or ADD) creates a unique layer. If the instruction and its input files remain unchanged, Docker reuses the existing layer from the cache instead of rebuilding it.
+RUN npm install
+
+# Copy all other files from your computer into /app
+# COPY . . looks like: "Copy everything here to there."
+# COPY . ./ looks like: "Copy everything here into the current folder." (./) is considered a "best practice"
+COPY . ./
+
+# Inform users/tools that we listen on 3000. (The EXPOSE instruction is primarily documentation. It tells whoever is using your Docker image: "Hey, the application inside this container is designed to listen on Port 3000.")
+# The -P trick: If you use a capital -P when running your container (docker run -P), Docker will automatically take all ports listed in EXPOSE and map them to random high-number ports on your host.
+# If you have 5 different Node apps all trying to use Port 3000, they will crash if you try to map them all to -p 3000:3000. Using -P lets Docker handle the traffic control for you.
+# The -P flag only works if you have the EXPOSE 3000 line in your Dockerfile. If you remove that line, -P will do nothing because Docker won't know which internal ports are available to be mapped.
+EXPOSE 3000
+
+# Run index.js (which is now at /app/index.js)
+CMD [ "node", "index.js" ]
+
+━━━━━━━━━━━━━━━ 🏗️ Multi-Stage Build ━━━━━━━━━━━━━━━
+
+# Single stage image size was: 129.88 MB
+# now it is: 129.05 MB
+
+# --- STAGE 1: Build Stage ---
+FROM node:18-alpine AS builder
+WORKDIR /build
+
+# Copy only what we need for installing dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy everything else and build (if you had a build step)
+COPY . .
+
+# --- STAGE 2: Run Stage ---
+FROM node:18-alpine AS runner
+WORKDIR /app
+
+# IMPORTANT: We only copy the necessary files from the "builder" stage
+COPY --from=builder /build/package.json ./
+COPY --from=builder /build/node_modules ./node_modules  # when you wrote: COPY --from=builder /build/node_modules ./ The Problem: In Docker, when you copy a folder to ./, it copies the contents of that folder, not the folder itself, due to which files are scattered in /app
+COPY --from=builder /build/index.js ./
+
+EXPOSE 3000
+
+# Start the app
+CMD ["node", "index.js"]
+
+━━━━━━━━━━━━━━━ 🧵 Docker Compose (Node app, dev) ━━━━━━━━━━━━━━━
+
+version: '3.8'
+
+# docker build -f .\Dockerfile -t app .
+# docker run -p 3000:3000 app
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app  # This is a key-value pair for file syncing. It follows the format: [Source on your PC] : [Destination in Container]
+      - /app/node_modules # Your local node_modules was built for your host OS (likely Windows), but the container runs Linux Alpine # Prevent overwriting container's node_modules
+
+━━━━━━━━━━━━━━━ 📨 Docker Compose (Kafka + Zookeeper) ━━━━━━━━━━━━━━━
+
+version: "3.9"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+# Commands to run
+
+# docker-compose up
+# docker ps
+
+# docker exec -it kafka bash
+
+# kafka-topics --list --bootstrap-server localhost:9092
+# kafka-topics --bootstrap-server localhost:9092 --create --topic whatsapp_notification
+# kafka-console-producer --topic whatsapp_notification --bootstrap-server localhost:9092
+# kafka-console-consumer --topic whatsapp_notification --from-beginning --bootstrap-server localhost:9092
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Docker Fundamentals ━━━━━━━━━━━━━━━
+
+1. What problem does Docker solve that virtual machines don't?
+   A: "Works on my machine" — packages the app + all dependencies into one portable image, without the cost of a full OS per app. You get consistency across environments AND lightweight density (dozens of containers where a host fits a few VMs).
+
+2. Difference between: Image, Container, Volume, Network?
+   A: Image = read-only blueprint (layers). Container = a running instance of an image with its own writable layer. Volume = persistent storage that lives OUTSIDE the container's filesystem (survives deletion). Network = virtual network letting containers talk to each other by name.
+
+3. Why are Docker containers lightweight?
+   A: They share the host kernel — no guest OS to boot or keep in RAM. A container is just a normal Linux process wrapped in namespaces (isolation) + cgroups (resource limits).
+
+4. What happens internally when you run: docker run nginx?
+   A: CLI → Docker daemon → image found locally or pulled from registry → container created (writable layer over the image) → namespaces, cgroups, and virtual network wired up → nginx starts as PID 1 inside the container.
+
+5. Why are containers considered ephemeral?
+   A: The writable layer dies with the container — anything not in a volume is gone. Containers are designed to be replaced, not repaired: crash → throw away → start a fresh one from the image.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Images ━━━━━━━━━━━━━━━
+
+6. What's the difference between COPY and ADD?
+   A: COPY just copies local files. ADD additionally auto-extracts tar archives and can download URLs — that magic makes builds unpredictable, so best practice: always COPY unless you specifically need tar extraction.
+
+7. Why does instruction order in a Dockerfile matter?
+   A: Layer caching — a changed instruction invalidates the cache for ITSELF and EVERY instruction after it. So put rarely-changing steps (deps install) first and frequently-changing steps (source copy) last.
+
+8. Why is this Dockerfile slow?  COPY . .  RUN npm install
+   A: COPY . . changes on EVERY code edit → its layer cache breaks → npm install reruns on every single build even though dependencies didn't change.
+
+9. How would you optimize this Dockerfile?
+   A: COPY package*.json first → RUN npm install → THEN COPY . . — now npm install stays cached until package.json actually changes. Add .dockerignore (node_modules, .git) and a slim base image.
+
+10. Why should package.json be copied before source code?
+   A: package.json changes rarely; source changes constantly. Copying it first means the expensive npm install layer is reused from cache on every code-only rebuild.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Layers ━━━━━━━━━━━━━━━
+
+11. What are Docker layers?
+   A: Each Dockerfile instruction (RUN/COPY/ADD) produces a read-only layer; the image is the stack of these layers (union filesystem). A container adds one writable layer on top.
+
+12. Why are Docker images immutable?
+   A: Layers are read-only and content-addressed (hash of contents). Nothing running can modify them — a "change" always means building new layers / a new image. That's what makes images shareable, cacheable and rollback-safe.
+
+13. How does Docker layer caching work?
+   A: For each instruction, if the instruction text AND its input files are unchanged since the last build, Docker reuses the stored layer instead of re-executing. The first mismatch breaks the chain — everything after it rebuilds.
+
+14. Changing one file causes the entire image to rebuild. Why?
+   A: That file is copied in an early layer (e.g. COPY . . near the top) — its layer invalidates, and all later layers rebuild with it. Fix: move the broad COPY as late as possible.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Networking ━━━━━━━━━━━━━━━
+
+15. How do two Docker containers communicate?
+   A: Put them on the same user-defined network — then they reach each other by container name as hostname (Docker's built-in DNS): http://api:3000. No port mapping needed for container↔container traffic.
+
+16. Why doesn't localhost inside a container refer to your laptop?
+   A: The container has its OWN network namespace — localhost is the container itself. To reach the host use host.docker.internal (Mac/Windows) or the host's IP / a shared network.
+
+17. Difference between: Bridge Network, Host Network, Overlay Network?
+   A: Bridge = default; private virtual network on one host, containers get their own IPs, ports published via NAT. Host = container shares the host's network stack directly (no isolation, no -p needed, port conflicts possible). Overlay = one virtual network spanning MULTIPLE hosts (Swarm/K8s) so containers on different machines talk as if local.
+
+18. How does Docker DNS work?
+   A: Docker runs an embedded DNS server at 127.0.0.11 inside every user-defined network; it resolves container names / compose service names / network aliases to container IPs. (The default bridge network does NOT get this — another reason to create your own.)
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Storage ━━━━━━━━━━━━━━━
+
+19. Container restarts. Your uploaded files disappear. Why?
+   A: They were written to the container's writable layer, which is destroyed when the container is removed/recreated. Anything that must survive belongs in a volume.
+
+20. Difference between: Bind Mount, Volume, tmpfs?
+   A: Bind mount = a host directory mapped in (you manage the path — great for live code sync in dev). Volume = Docker-managed storage under /var/lib/docker/volumes (portable, safer perms — right choice for data). tmpfs = RAM-only, vanishes on stop (secrets, scratch space).
+
+21. When should you use volumes?
+   A: Any data that must outlive the container: database files, user uploads, logs you keep — and for sharing data between containers.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Performance ━━━━━━━━━━━━━━━
+
+22. Your Docker image is 2 GB. How do you reduce it?
+   A: Slimmer base (alpine/slim/distroless), multi-stage build (ship artifacts only), .dockerignore (node_modules, .git, tests), production deps only (npm ci --omit=dev), merge RUN commands and clean package caches in the same layer.
+
+23. Why are Alpine images not always the best choice?
+   A: Alpine uses musl libc instead of glibc — native modules may need recompiling or break subtly, DNS behaves differently, and debugging tools are missing. node:18-slim (Debian-based) is often the safer small option.
+
+24. How does multi-stage build reduce image size?
+   A: Compilers, dev dependencies and build junk stay in the builder stage; the final stage COPY --from=builder takes only the runtime artifacts. The shipped image never contains the build toolchain.
+
+25. Why shouldn't you install build tools in production images?
+   A: They're only needed at build time — in prod they add hundreds of MB, slow pulls/deploys, and enlarge the attack surface (a compiler in the container is a gift to an attacker).
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Security ━━━━━━━━━━━━━━━
+
+26. Why shouldn't containers run as root?
+   A: The kernel is shared — container root that escapes IS host root. Run as a non-root user (USER node), drop capabilities, so an app compromise stays an app compromise.
+
+27. Where should secrets be stored?
+   A: Injected at RUNTIME, never baked into the image: Docker/Kubernetes secrets, a secret manager (Vault, AWS Secrets Manager), or env vars supplied by the orchestrator at start.
+
+28. Why shouldn't ENV PASSWORD=... be used?
+   A: It's permanently baked into the image layers — visible via docker history / docker inspect to anyone who gets the image, and inherited by every container. Build args leak the same way.
+
+29. How do attackers escape containers?
+   A: Kernel exploits (shared kernel = shared blast radius), --privileged containers, a mounted /var/run/docker.sock (full daemon control = host takeover), excess Linux capabilities, and careless host path mounts. Mitigate: least privilege, no docker.sock in containers, updated kernel, seccomp/AppArmor.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Production ━━━━━━━━━━━━━━━
+
+30. Container crashes every few hours. How do you debug?
+   A: docker ps -a for the exit code (137 = OOM-killed), docker logs of the dead container for the last output, docker stats over time (memory leak climbing to the limit?), docker inspect for restart count/policy, then correlate crash times with load or scheduled jobs.
+
+31. Container works locally but fails in production. Possible reasons?
+   A: Env vars/secrets missing, CPU/memory limits enforced in prod, architecture mismatch (ARM Mac image vs x86 server), different network/DNS rules, volumes not mounted, different image tag actually deployed ("latest" drift).
+
+32. Application says: Connection refused inside Docker. How do you debug?
+   A: Check in order: is the app listening on 0.0.0.0 (not 127.0.0.1 — the #1 cause)? right port + -p mapping? are the two containers on the same network and using the service NAME not localhost? Then docker exec in and curl the target to bisect where it dies.
+
+33. Container is healthy. Users still get 500 errors. Possible reasons?
+   A: The health check is shallower than reality — /health returns 200 while the DB, cache or a downstream API is failing, or config is wrong. Health ≠ correctness: make checks exercise real dependencies and read the app logs.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Docker Compose ━━━━━━━━━━━━━━━
+
+34. Why use Docker Compose?
+   A: One YAML defines the whole multi-container stack (app + db + cache + queue): one command up/down, automatic shared network, dependency ordering, and identical dev environments for the whole team.
+
+35. How do containers discover each other in Compose?
+   A: Compose puts all services on a default project network; each SERVICE NAME becomes a DNS hostname — the app connects to mysql://db:3306, not an IP.
+
+36. Should MySQL use: named volume or bind mount? Why?
+   A: Named volume — Docker manages location, permissions and performance, and it's not coupled to the host's folder layout. Bind mounts are for syncing SOURCE CODE in dev, not database files.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Scaling ━━━━━━━━━━━━━━━
+
+37. Can you scale stateful containers?
+   A: Yes, but not by just adding replicas — each instance needs a stable identity + its own storage + application-level replication (that's what K8s StatefulSets provide). Only STATELESS containers scale by simply increasing the replica count.
+
+38. Why is scaling Redis harder than scaling Node.js?
+   A: Node is stateless — any replica can serve any request; just add instances behind a LB. Redis HOLDS the data — scaling it means replication/sharding (Redis Cluster), and now you own consistency, failover and resharding problems.
+
+39. Can you load balance WebSocket containers? How?
+   A: Yes — the LB needs sticky sessions (or consistent hashing) because connections are long-lived, plus a shared pub/sub backbone (Redis) so a message for a user connected to node A can be delivered even if node B produced it.
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Architecture ━━━━━━━━━━━━━━━
+
+40. Should every microservice have its own Docker image?
+   A: Yes — independent build, version, deploy, rollback and scaling per service. One shared image with many services is a distributed monolith: every deploy ships everything.
+
+41. Would you put MySQL inside Docker in production? Why or why not?
+   A: Usually no — a managed DB (RDS etc.) handles backups, patching, failover and storage better; databases gain little from container portability and are the riskiest thing to get wrong. Containerized MySQL is great for dev/test; if you must do it in prod: named volumes on fast disks, pinned versions, real backup strategy.
+
+42. How do rolling deployments work with Docker?
+   A: Start new-version containers next to the old ones → wait for health checks to pass → shift traffic over → drain and stop old containers, a batch at a time. Orchestrators (K8s/ECS/Swarm) automate it; requires the two versions to coexist (backward-compatible APIs/migrations).
+
+━━━━━━━━━━━━━━━ ❓ Q&A: Deep Questions ━━━━━━━━━━━━━━━
+
+43. What happens from the moment you run docker run nginx until the nginx process starts?
+   A: CLI sends the request to dockerd → image resolved locally or pulled layer-by-layer from the registry → containerd creates the container: OverlayFS mounts the read-only layers + a fresh writable layer → runc creates namespaces (pid, net, mnt, uts, ipc, user) and cgroups → a veth pair connects the container to the bridge network → runc exec's nginx as PID 1 inside the new namespaces.
+
+44. Docker is "just Linux features." Which Linux features make Docker possible?
+   A: Namespaces (each container gets its own view of processes, network, mounts, hostname, users), cgroups (CPU/memory/IO limits), union filesystems (OverlayFS — stacked image layers + copy-on-write), and capabilities + seccomp (trimming root's powers). Docker is the packaging/UX on top.
+
+45. If Docker isn't a virtual machine, why does it feel isolated?
+   A: Namespaces fake a private machine: your own PID 1, own filesystem root, own network interfaces, own hostname. But it's logical isolation on a SHARED kernel — nothing is virtualized, which is exactly why it's fast and why kernel exploits pierce it.
+
+46. How can two containers use the same image but have different files?
+   A: Copy-on-write — both share the same read-only image layers; each container writes changes to its OWN private writable layer on top. Reads fall through to the shared layers; writes copy the file up into the private layer.
+
+47. Why does deleting a container usually not delete its image?
+   A: They're separate objects — the image is a shared, read-only artifact that many containers can be created from. docker rm removes only that container's writable layer + metadata; the image stays until docker rmi.
+
+48. Why are Docker containers faster to start than VMs?
+   A: No boot — a VM must initialize virtual hardware and boot a whole guest kernel + OS; a container start is essentially fork/exec of a process with namespaces and cgroups applied. Milliseconds vs minutes.
+
+49. How would you deploy a Node.js application with zero downtime using Docker?
+   A: Build the new image → start new container(s) alongside the old → wait until health checks pass → switch traffic at the reverse proxy/LB (nginx upstream swap, or let K8s/ECS rolling-update do it) → drain connections and stop the old containers. Keep the previous image tagged for instant rollback; never deploy by stopping-then-starting in place.
+
+50. Your Docker host suddenly runs out of disk space. What are the first five things you'd check before deleting anything?
+   A: (1) docker system df — what's actually eating space (images/containers/volumes/cache); (2) container LOG files — /var/lib/docker/containers/*/*-json.log grow unbounded without log rotation, classic culprit; (3) dangling images (docker images -f dangling=true) from repeated builds; (4) stopped containers and unused volumes (docker volume ls -f dangling=true) — volumes are never auto-deleted; (5) build cache (docker builder du). Then prune selectively (docker image prune, NOT a blind system prune -a --volumes which can kill data).
