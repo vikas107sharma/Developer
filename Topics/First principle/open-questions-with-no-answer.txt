@@ -417,6 +417,14 @@
 6. One third-party API becomes slow. How do you stop it from bringing down your entire application?
    Hint: Aggressive TIMEOUTS (a slow dependency is worse than a dead one), circuit breaker to stop calling it while it's sick, a bulkhead (dedicated, small connection/thread pool so it can't exhaust shared pools), a fallback response, and move the call off the critical path (async/queue) wherever the user doesn't need its result immediately.
 
+7. What is connection pooling and what is the meaning of these, when we setup a connection pool ?
+ const adapter = new PrismaPg({
+   connectionString: config.DATABASE_URL,
+   max: config.PG_POOL_MAX,
+   idleTimeoutMillis: config.PG_POOL_IDLE_TIMEOUT_MS,
+   connectionTimeoutMillis: config.PG_POOL_CONNECTION_TIMEOUT_MS,
+});
+
 ━━━━━━━━━━━━━━━ 🏗️ Architecture & System Design ━━━━━━━━━━━━━━━
 
 1. Where does idempotency belong? API Gateway, Service, Database, Queue Consumer.
@@ -468,3 +476,5 @@
 
 16. Imagine you have to build Flipkart today from scratch. What are the first three engineering decisions that will have the biggest impact five years later? Why?
     Hint: Pick decisions that are nearly impossible to reverse: (1) data model + service/domain boundaries (wrong boundaries haunt every future feature and force painful migrations), (2) an event-driven backbone with idempotency from day one (retrofitting exactly-once semantics onto a sync-only system is brutal), (3) observability + multi-tenancy/sharding strategy baked in early (you can't add tracing or reshard 5-year-old data cheaply). Framework/language choices matter far less — those are replaceable; data gravity is not.
+
+17. gossip protocol

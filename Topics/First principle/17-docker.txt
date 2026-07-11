@@ -205,6 +205,20 @@ services:
 # kafka-console-producer --topic whatsapp_notification --bootstrap-server localhost:9092
 # kafka-console-consumer --topic whatsapp_notification --from-beginning --bootstrap-server localhost:9092
 
+━━━━━━━━━━━━━━━ 📨 Docker Compose (Kafka + Zookeeper) ━━━━━━━━━━━━━━━
+
+#!/bin/bash
+
+docker stop my-node-app || true
+docker rm my-node-app || true
+
+docker build -t my-node-app .
+
+docker run -d \
+  --name my-node-app \
+  -p 3001:3001 \
+  my-node-app
+
 ━━━━━━━━━━━━━━━ ❓ Q&A: Docker Fundamentals ━━━━━━━━━━━━━━━
 
 1. What problem does Docker solve that virtual machines don't?

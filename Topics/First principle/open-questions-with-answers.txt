@@ -79,3 +79,37 @@ Low Queue  -> 1 worker
 The low-priority worker becomes idle after finishing its 2 jobs, while the high-priority worker remains overloaded. The challenge shifts from starvation to efficient resource utilization.
 
 
+# ━━━━━━━━━━━━━━━ ⏳ Cache Versioning ━━━━━━━━━━━━━━━
+
+This technique is called:
+
+Cache Versioning (most common name)
+
+Other names you'll hear:
+
+Versioned Cache Keys
+Version-based Cache Invalidation
+Generational Cache Invalidation (used by some companies and libraries)
+
+Example:
+
+reviews:ver:123 = 0
+
+↓
+
+reviews:v0:123:newest:page1
+reviews:v0:123:oldest:page2
+
+After a new review:
+
+INCR reviews:ver:123
+
+↓
+
+reviews:ver:123 = 1
+
+Now requests use:
+
+reviews:v1:123:newest:page1
+
+The old v0 keys become orphaned and expire naturally via TTL.
