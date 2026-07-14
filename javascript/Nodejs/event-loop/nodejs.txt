@@ -1,6 +1,7 @@
 ━━━━━━━━━━━━━━━ 🧠 V8 vs Libuv ━━━━━━━━━━━━━━━
 
-The Event Loop is the design pattern (the concept).
+The event loop is what allows Node.js to perform non-blocking I/O operations — despite the fact that a single JavaScript thread is used by default — by offloading operations to the system kernel whenever possible.
+
 Libuv is the engine (the implementation) that runs it in Node.js.
 
 🧠 V8 (C++): executes your JavaScript.
