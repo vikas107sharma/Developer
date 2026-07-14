@@ -1,57 +1,44 @@
-docker build -f Dockerfile.dev -t node-app-dev .
+CONTAILERS    - Running instances of Docker images (like live processes).
+IMAGES        - Read-only templates used to create containers (like blueprints).
 
+docker build -f Dockerfile.dev -t node-app-dev .
 docker build -f Dockerfile.prod -t node-app-prod .
 
 docker run -d -p 3000:3000 node-app
+docker run -d -p 8080:3000 --name node-app-prod-container node-app-prod
 
 docker logs -f <container_id>
+docker logs -f node-app-prod-container
 
-
-docker run -p 8080:3000 my-app
-3000 → container port (your app is listening here inside container)
-8080 → host port (you access via localhost:8080 on your machine)
-
-
+docker stop <containerid>          - Stop a running container.
+docker start <containerid>         - Start a stopped container.
 
 docker ps and logs
 Flag	Description	Example
 -a	Show all containers (even stopped)	docker ps -a
 -f	Follow logs in real-time	docker logs -f my-container
 
-
-
 docker images           - show all images
-
-
 
 docker run
 Flag	Description	Example
 -d	Run container in background (detached)	docker run -d nginx
 -p	Map port (host:container)	docker run -p 8080:80 nginx
 -e	Set environment variable	-e NODE_ENV=production
+-v  set volume
 
+docker run -d \
+  --name production-app \
+  -p 8080:3000 \
+  -e NODE_ENV=production \
+  -v $(pwd):/app \
+  node-app-prod
 
 
 docker build
 Flag	Description	Example
 -f	Specify Dockerfile name	docker build -f Dockerfile.dev .
 -t	Tag the image with a name	docker build -t my-app .
-
-
-
-
-
-
-CONTAILERS    - Running instances of Docker images (like live processes).
-Container = created using docker run
-
-IMAGES        - Read-only templates used to create containers (like blueprints).
-Image = built using docker build
-
-
-
-docker stop <containerid>          - Stop a running container.
-docker start <containerid>         - Start a stopped container.
 
 
 Command	One-Line Explanation
@@ -70,16 +57,9 @@ docker exec -it <container> bash	Enter running container terminal.
 docker logs <container>	View container logs.
 
 
-
 docker network create <name>	               - Create Docker network.
 docker network ls                              - show network
 docker network rm <network_name_or_id>         - remove network
-
-
-No — one container = one image.
-A container is always created from one specific image.
-You can't run multiple images inside one container.
-
 
 
 | Docker (Containers)     | Virtual Machines            |
@@ -105,8 +85,6 @@ Dockerfile — file containing instructions to build an image.
 Docker Hub — public registry for images.
 
 Docker Compose — tool to manage multi-container apps.
-
-
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -193,7 +171,6 @@ CMD ["node", "index.js"]
 
 Docker compose
 
-
 version: '3.8'
 
 # docker build -f .\Dockerfile -t app .
@@ -209,3 +186,29 @@ services:
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+┌────────────────────────────────────────────────────────┐
+│                   RUNNING CONTAINER                    │
+│                                                        │
+│   ┌────────────────────────────────────────────────┐   │
+│   │ IMAGE LAYER (Base OS + Node.js Runtime)        │   │
+│   └────────────────────────────────────────────────┘   │
+│                           ▲                            │
+│     Volumes bridge the host to the running container   │
+│                           ▼                            │
+│   ┌───────────────────────┬────────────────────────┐   │
+│   │ HOST MACHINE VOLUME   │ ANONYMOUS IMAGE VOLUME │   │
+│   │ (.:/app)              │ (/app/node_modules)    │   │
+│   │ Live JavaScript Code  │ Linux Binaries/Pkgs    │   │
+│   └───────────────────────┴────────────────────────┘   │
+└────────────────────────────────────────────────────────┘
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+node:18 is the full Debian-based image. It includes the runtime along with a massive set of build tools like GCC and Python. It’s around 1GB, making it great if you have heavy native C++ dependencies that need compilation.
+
+node:18-slim is that same Debian image but stripped of all non-essential build tools. It shrinks the size down to about 200MB, giving you standard Linux compatibility without the bloat.
+
+node:18-alpine switches the underlying OS completely to Alpine Linux. It is ultra-lightweight at just 50MB, perfect for fast CI/CD pipelines and security. The only catch is that it uses musl instead of glibc, so native binaries sometimes require manual setup."
+
+Production Gotcha: Because Alpine uses musl instead of glibc, certain packages that compile native binaries (like bcrypt or sharp) might fail to install out-of-the-box on Alpine unless you manually install build dependencies (apk add --no-cache make gcc g++ python3). If you run into annoying compilation bugs on Alpine, switching to -slim usually fixes them immediately while keeping the image size reasonable.

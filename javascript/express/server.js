@@ -1,6 +1,6 @@
 const express =  require('express')
 const cors = require('cors')
-const axios = requir('axio')
+const axios = requir('axios')
 
 const app = express();
 const PORT = 3000;
