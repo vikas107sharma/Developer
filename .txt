@@ -1,0 +1,19 @@
+scores live 
+user -> leadreboard (all details, top 20)
+types -> per match, per ball 
+at a time -> 500 (initial) -> 0 then out
+
+
+SSE (full duplex nhi chahiye) -> frontend 
+scores live 
+user -> leadreboard (all details, top 20)
+
+bet table
+user amount type(enum) 
+
+user_wallet 
+user wallet_amount winning_amount 
+
+
+top 20
+this will come from redis (sorted set)

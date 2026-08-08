@@ -1,8 +1,19 @@
+References:
+
+Event loop: https://nodejs.org/learn/asynchronous-work/event-loop-timers-and-nexttick
+Clusters: https://nodejs.org/api/cluster.html
+
+
 ━━━━━━━━━━━━━━━ 🧠 V8 vs Libuv ━━━━━━━━━━━━━━━
 
 The event loop is what allows Node.js to perform non-blocking I/O operations — despite the fact that a single JavaScript thread is used by default — by offloading operations to the system kernel whenever possible.
 
 Libuv is the engine (the implementation) that runs it in Node.js.
+
+"Libuv is the C++ library that gives Node.js its asynchronous, non-blocking I/O capabilities. It provides and manages the Event Loop, and it uses an internal Worker Thread Pool to offload heavy tasks (like File System and Crypto operations) so the single JavaScript main thread never gets blocked."
+
+Follow-up tip: If they ask how it handles the network, add:
+"For network requests, libuv doesn't use the thread pool; it delegates the work directly to the Operating System's native async interfaces (like epoll on Linux)."
 
 🧠 V8 (C++): executes your JavaScript.
 💪 Libuv (C++): handles everything that isn't JS — file reads, network packets, timers.
@@ -73,7 +84,7 @@ process.nextTick()  -> always wins
 setTimeout()        -> timers phase
 setImmediate()      -> check phase
 
-📚 nodejs.org/learn/asynchronous-work/event-loop-timers-and-nexttick
+
 
 
 ━━━━━━━━━━━━━━━ 🧵 The Thread Pool ━━━━━━━━━━━━━━━

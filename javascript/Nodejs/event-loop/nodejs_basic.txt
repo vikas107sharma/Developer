@@ -1,0 +1,100 @@
+━━━━━━━━━━━━━━━ 🌍 Callbacks, Promise, Async, Await ━━━━━━━━━━━━━━━
+
+1. Callbacks (Inversion of Control)
+A Callback is a function passed into an asynchronous function to be invoked when the operation completes.
+
+The Problem: It suffers from Inversion of Control—you hand over execution authority to a third-party function, meaning you can't guarantee if or how many times your callback gets called. It also leads to deep nesting—or Callback Hell—making code difficult to maintain and error handling clunky via the (err, result) convention.
+
+You give your code to getUser and say: "Here is my function, you invoke it whenever you are ready."
+
+The Problem: You lose control. If getUser has a bug, it might invoke your function zero times, multiple times, or run it synchronously by mistake.
+
+// ❌ 1. Callback: Nested & Inversion of Control
+getUser(id, (err, user) => {
+  if (err) return handleError(err);
+  getOrders(user.id, (err, orders) => { /* ... */ });
+});
+
+
+2. Promises (Reclaiming Control)
+A Promise solves this by returning a stateful object—pending, fulfilled, or rejected—that acts as a proxy for a future value.
+
+Instead of handing your function to getUser, getUser immediately hands you a Promise object (a placeholder/receipt for future data).
+
+You attach .then(callback) to that receipt:
+
+The Difference: getUser doesn't call your function anymore. The V8 JavaScript engine itself monitors the Promise object. Once the Promise changes status from pending to fulfilled, the JS engine places your .then() callback into the Microtask Queue and invokes it safely exactly once.
+
+How it Works: Instead of passing a callback in, the function returns a Promise that you listen to via .then() and .catch().
+
+The Key Advantage: It reclaims control flow, supports composition methods like Promise.all(), and executes callbacks via the Microtask Queue, guaranteeing they run after the current call stack completes.
+// 🟡 2. Promise: Stateful & Microtask Queue
+getUser(id)
+  .then(user => getOrders(user.id))
+  .then(orders => console.log(orders))
+  .catch(handleError);
+
+
+3. Async/Await (Syntactic Sugar over Promises)
+Async/Await is syntactic sugar built on top of Promises and Generators.
+
+How it Works: Mark a function async, and you can await any Promise. V8 pauses execution at the await statement, yields back to the main thread non-blockingly, and resumes once the microtask resolves.
+
+Under the hood, async/await is still using Promises. It does not change how Node.js handles async operations; it just gives you a cleaner syntax so you don't have to write long .then() chains.
+
+It pauses execution of that specific function, not the entire application or thread.
+
+It returns control to the main event loop immediately so Node can handle other incoming HTTP requests, timers, or I/O.
+
+The Key Advantage: It lets us write non-blocking asynchronous code using familiar, synchronous imperative syntax, allowing us to use standard try/catch blocks for clean, unified error handling."
+try {
+  const user = await getUser(id);
+  const orders = await getOrders(user.id);
+  console.log(orders);
+} catch (err) {
+  handleError(err);
+}
+
+
+1. Promise.all() (all-or-nothing)
+Fulfills when ALL promises resolve successfully. Rejects immediately if ANY promise rejects (short-circuit on first error).
+Resolves with an array of values matching the input order, or rejects with the first error reason.
+const [user, settings] = await Promise.all([
+  getUser(id),
+  getSettings(id)
+]);
+
+
+2. Promise.allSettled()
+Waits for ALL promises to complete, regardless of whether they fulfill or reject (never short-circuits on rejection).
+Resolves with an array of result objects describing each outcome: { status: 'fulfilled', value } or { status: 'rejected', reason }.
+const results = await Promise.allSettled([
+  sendEmail(user1),
+  sendEmail(user2)
+]);
+// Safe to iterate: check status === 'fulfilled' or 'rejected'
+
+
+3. Promise.any()
+Fulfills as soon as ANY promise fulfills (first success). Ignores rejections unless ALL promises reject.
+Resolves with the first fulfilled value. If all fail, it rejects with an AggregateError containing all rejection reasons.
+try {
+  // Returns result from whichever mirror responds successfully first
+  const data = await Promise.any([
+    fetchFromCDN1(),
+    fetchFromCDN2()
+  ]);
+} catch (err) {
+  // AggregateError: All promises were rejected
+}
+
+4. Promise.race()
+Settles as soon as ANY promise settles—whether it fulfills OR rejects (first to cross the finish line wins).
+// Times out if fetch takes longer than 5 seconds
+const timeout = new Promise((_, reject) => 
+  setTimeout(() => reject(new Error('Timeout')), 5000)
+);
+const data = await Promise.race([
+  fetchData(),
+  timeout
+]);

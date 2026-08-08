@@ -1,0 +1,86 @@
+1. What is the Event Loop?
+The Event Loop is a C++ mechanism (provided by the libuv library) that allows Node.js to perform asynchronous, non-blocking operations on a single thread. It offloads heavy tasks (like I/O or network requests) to the OS or a thread pool, and continuously cycles through specific queues to execute the resulting callbacks once those tasks are finished.
+
+2. What are the phases?
+The Event Loop cycles through 6 sequential phases:
+
+Timers Phase: Executes expired setTimeout and setInterval callbacks.
+
+Pending Callbacks Phase: Executes deferred system-level I/O errors (e.g., TCP connection refused).
+
+Idle, Prepare Phase: Internal Node.js engine use only.
+
+Poll Phase: Retrieves new I/O events and executes most I/O callbacks (file system, network).
+
+Check Phase: Executes setImmediate callbacks.
+
+Close Callbacks Phase: Executes cleanup callbacks (e.g., socket.on('close')).
+
+3. Where does setTimeout execute?
+It executes in the Timers Phase, which is the very first phase of the Event Loop cycle.
+
+4. Where does setImmediate execute?
+It executes in the Check Phase, which directly follows the Poll Phase.
+
+5. Where do Promises execute?
+Promises do not execute inside the Event Loop phases. They execute in the Microtask Queue. This queue sits between the phases and is checked/drained immediately after the synchronous call stack empties, or right after any phase finishes its current operation, before the loop is allowed to move forward.
+
+6. Why are Promises executed before timers?
+Because microtasks (Promises) represent high-priority state changes that the engine assumes need to be resolved immediately for the current execution context to be correct. By design, Node.js prioritizes emptying the Microtask Queue before it yields control back to the libuv Event Loop to check for expired timers (macrotasks).
+
+7. Difference between process.nextTick() and Promise microtasks?
+Both execute between event loop phases, but they live in separate queues with strict priority:
+
+nextTick Queue: A Node.js specific queue. It has the absolute highest priority. It is always drained completely first.
+
+Promise Microtask Queue: A V8 engine specific queue. It is only checked and drained after the nextTick queue is completely empty.
+
+8. Can process.nextTick() starve the Event Loop?
+Yes, absolutely.
+
+9. Why does it starve the Event Loop?
+Because Node.js places a strict blocker at the end of the current operation: it refuses to move to the next Event Loop phase (or even look at Promises) until the nextTick queue hits zero. If a nextTick callback recursively schedules another nextTick callback, the queue never empties. The single thread gets trapped in an infinite microtask loop, freezing all incoming I/O, network requests, and timers.
+
+
+What is libuv? A multi-platform C library that provides Node.js with its Event Loop and asynchronous, non-blocking I/O architecture.
+
+What does libuv actually do? It orchestrates the Event Loop phases, manages a background Worker Thread Pool, and acts as a universal abstraction layer over the OS's native async interfaces (translating to epoll on Linux, kqueue on macOS, and IOCP on Windows).
+
+Why does Node.js need libuv? The V8 engine is strictly single-threaded and only executes JavaScript. Libuv provides the "muscle" to offload blocking system tasks, ensuring the main V8 thread never freezes while waiting for resources.
+
+Which operations go to libuv? Network I/O (TCP/UDP, HTTP), File System operations (fs), DNS lookups (dns.lookup), and heavy internal modules like Cryptography (crypto) and Compression (zlib).
+
+Which operations don't? Custom synchronous JavaScript (like heavy for loops or massive array mapping), JSON parsing, and native V8 tasks (like garbage collection). These block the main thread.
+
+How many threads exist by default? The libuv Thread Pool allocates exactly 4 worker threads by default. (This is in addition to the 1 Main Thread).
+
+Can we increase the thread pool? Yes, by setting process.env.UV_THREADPOOL_SIZE at application startup. It can scale up to 128 threads. For optimal performance, it is generally mapped to the number of physical CPU cores.
+
+What happens if the thread pool is exhausted? New tasks are placed into a pending queue. The main thread is not blocked (it will keep serving network traffic), but the callbacks for the pending heavy tasks will experience massive latency spikes because they must wait for an active worker thread to free up.
+
+
+
+
+
+
+Worker Threads (⭐⭐⭐⭐⭐)              
+                        
+Why introduced?
+To offload CPU-bound tasks (cryptography, compression) so they don't block Node's single-threaded event loop.
+
+Worker Threads vs. Child Processes?
+Worker Threads: Same process, shared memory, low resource overhead.
+
+Child Processes: Separate OS process, isolated memory, high resource overhead.
+
+When to use?
+Exclusively for heavy CPU computations. (Avoid for I/O tasks, which Node already handles efficiently via async architecture).
+
+Can they share memory?
+Yes, they can mutate the exact same memory space instead of passing serialized messages.
+
+How?
+By passing a SharedArrayBuffer reference from the main thread to workers using postMessage().
+
+What is SharedArrayBuffer?
+A low-level object representing a fixed-length raw binary data buffer shared directly across threads. It is manipulated via typed arrays and secured against race conditions using the Atomics API.

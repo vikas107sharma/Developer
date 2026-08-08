@@ -478,3 +478,21 @@
     Hint: Pick decisions that are nearly impossible to reverse: (1) data model + service/domain boundaries (wrong boundaries haunt every future feature and force painful migrations), (2) an event-driven backbone with idempotency from day one (retrofitting exactly-once semantics onto a sync-only system is brutal), (3) observability + multi-tenancy/sharding strategy baked in early (you can't add tracing or reshard 5-year-old data cheaply). Framework/language choices matter far less — those are replaceable; data gravity is not.
 
 17. gossip protocol
+
+18. There is a table with multiple columns now you have to implement unique check, but the catch is for each type of the the uniqueness is different. 
+
+
+
+Problem Statement: 
+
+s = "fdsklf"
+
+while i >= 0 and j < n:
+    if s[i] == s[j]:
+        ans += 1
+
+while i >= 0 and j < n and s[i] == s[j]:
+    i -= 1
+    j += 1
+    ans += 1
+   
