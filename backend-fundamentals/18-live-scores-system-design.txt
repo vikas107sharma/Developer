@@ -1,0 +1,32 @@
+━━━━━━━━━━━━━━━ 🏏 Live Scores — System Design ━━━━━━━━━━━━━━━
+
+Goal: stream live match scores + leaderboard to users in real time.
+
+🔹 What updates
+📊 Scores: live, pushed to the frontend.
+🎯 Types: per match  and  per ball.
+⏱️ Volume: ~500 events at a time (initial) -> drains to 0 -> "out".
+
+
+━━━━━━━━━━━━━━━ 📡 Real-Time Delivery ━━━━━━━━━━━━━━━
+
+🔹 Transport: SSE (Server-Sent Events)
+Server -> frontend, one-way push.
+Full duplex nahi chahiye -> no WebSocket needed, SSE is enough.
+
+
+━━━━━━━━━━━━━━━ 🏆 Leaderboard ━━━━━━━━━━━━━━━
+
+👤 User -> leaderboard: all details, Top 20.
+
+🔹 Storage
+Top 20 comes from Redis Sorted Set (ZSET) — ranked reads are O(log n), ideal for leaderboards.
+
+
+━━━━━━━━━━━━━━━ 💰 Betting Data Model ━━━━━━━━━━━━━━━
+
+🔹 bet
+user | amount | type (enum)
+
+🔹 user_wallet
+user | wallet_amount | winning_amount

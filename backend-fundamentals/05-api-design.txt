@@ -2,6 +2,30 @@ URL:
 https://api.example.com/v1/books/123  > 
 sceme + subdomain + version
 
+Ways to make apis faster
+
+
+
+Cacheing
+
+Connection pooling
+
+N+1
+
+Pagination
+
+Json serialisation
+
+Payload compression
+
+Async logging
+
+
+
+Use promise.all if batch third
+
+party api calls 
+
 ━━━━━━━━━━━━━━━ 🔐 HTTPS — how is it secure? ━━━━━━━━━━━━━━━
 
 In HTTP:

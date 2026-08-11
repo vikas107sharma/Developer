@@ -4,12 +4,6 @@ A. Can I have your pen ?
 B. Here you go 
 
 
-2. Certainly -> (used in answer to questions) of course
-
-A: Can you do this by tomorrow?
-B: Certainly. I'll have it ready by tomorrow.
-
-‘Do you think I could borrow your notes?’ ‘Certainly.’
 
 
 3. Not necessary.
@@ -54,9 +48,50 @@ Either → Negative sentences.
 I don't like coffee. I don't like tea either.
 
 
-10. Exactly -> That's completely correct / Precisely.
-A: We need to fix the root cause, not the symptom.
+10. Exactly = “That is correct / precisely”
+Use it when agreeing with or confirming someone's statement.
+
+Example:
+
+A: So the issue is because the webhook isn't reaching our server?
 B: Exactly.
+
+A: You mean the payment is already verified?
+B: Exactly.
+
+
+2. Certainly = “Yes, definitely / of course”
+
+Use it when agreeing to do something or confirming that something can be done. It is more formal than “sure.”
+
+Example:
+
+A: Can you check this?
+B: Certainly.
+
+A: Can you deploy this today?
+B: Certainly, I'll take care of it.
+
+Indeed = “Yes, that is true”
+
+Use it when strongly agreeing with or confirming a fact. It sounds more formal and is less common in casual workplace chat.
+
+Example:
+
+A: This is a production issue.
+B: Indeed.
+
+A: The implementation is more complex than expected.
+B: Indeed, it is.
+
+| Word           | Meaning                          | Use it when                                      | Example                                                    |
+| -------------- | -------------------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| **Exactly**    | “That’s precisely correct.”      | Someone has correctly understood something       | “So the issue is with the webhook?” → **Exactly.**         |
+| **Certainly**  | “Yes, definitely / of course.”   | Someone asks you to do something                 | “Can you check this?” → **Certainly.**                     |
+| **Indeed**     | “Yes, that is true.”             | Confirming a fact; sounds more formal            | “This is a complex flow.” → **Indeed.**                    |
+| **Agreed**     | “I agree with this.”             | Agreeing with a suggestion, opinion, or decision | “We should discuss this with the client.” → **Agreed.**    |
+| **Absolutely** | “Definitely / completely agree.” | Strongly agreeing or confirming                  | “This needs to be fixed before release.” → **Absolutely.** |
+
 
 Exactly. → I completely agree. ✅
 Okay. → I understand / I accept the plan. ✅
@@ -119,3 +154,4 @@ B: Neither do I.
 
 21. Rather: Preference / to some extent.
 I'd rather stay home.
+

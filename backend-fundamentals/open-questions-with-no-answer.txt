@@ -496,3 +496,7 @@ while i >= 0 and j < n and s[i] == s[j]:
     j += 1
     ans += 1
    
+
+19. We have a fan-out architecture where one event triggers four distinct consumers. How would you design the system to handle a scenario where three consumers succeed, but the fourth fails permanently?
+
+20. We have to process 1 gb file and parse the data and save it to database tables, if data validation fails then nothing should be saved in the database. This was the interview questions asked in product based company

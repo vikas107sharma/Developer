@@ -50,6 +50,7 @@ Server → Validates token using secret/private key
 
 Three parts:
 Header + Payload (JSON) + Signature 
+If you don't use a secret, or if the secret is known to the client, a user could decode their token, change {"role": "user"} to {"role": "admin"}, and re-encode it.
 
 1. No server side storage cost 
 2. Scalability in distributed or microservice architecture
@@ -239,6 +240,8 @@ No new access tokens can be issued.
 
 This limits the window of access without checking the database on every request.
 
+Why keep it in the DB? It gives you stateful control. You can instantly revoke sessions (force logout), track active devices, and detect stolen tokens (via token rotation and reuse detection).
+
 
 ✅✅ API KEY AUTHENTICATION ✅✅
 
@@ -268,6 +271,9 @@ Use HTTPS only
 Add rate limiting
 Rotate keys periodically
 Never expose secret keys in frontend
+Cors
+Rate limiting
+Middleware validating input
 
 
 ✅✅ OAUTH 2.0 / OPENID CONNECT (OIDC) ✅✅

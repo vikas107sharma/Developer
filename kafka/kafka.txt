@@ -610,3 +610,18 @@ Quick decision shortcuts
 
 One-liner summary
 RabbitMQ for work distribution, Kafka for event streaming and replay, SQS for managed simplicity on AWS.
+
+
+================== SQS ========================
+
+Benefits of SQS over kafka
+Zero operational burden. SQS is fully serverless — no brokers, no Zookeeper/KRaft, no partitions to size
+Cost at low volume. SQS is pay-per-request (first 1M requests/month free, then ~$0.40/M). Kafka has a fixed floor — an MSK cluster costs money 24/7 even at zero traffic. 
+Built-in retry + DLQ semantics. Visibility timeout, per-message redelivery, DLQ after N failures are native. In Kafka you build all of this yourself (retry topics, DLQ topics, consumer offset management around poison messages).
+Simpler consumer model. Receive → process → delete. No consumer groups, offsets, rebalancing storms, or partition assignment
+Effortless scaling of consumers. You can add pollers freely; SQS handles distribution. Kafka caps parallelism at partition count
+
+
+No replay. Once a message is deleted, it's gone
+One consumer per message, no fan-out. SQS is a work queue
+Throughput and payload ceilings. 256 KB max message size
