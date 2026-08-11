@@ -1,157 +1,115 @@
-1. Here you go -> this is what you wanted
+━━━━━━━━━━━━━━━ 💬 Useful Everyday Phrases ━━━━━━━━━━━━━━━
 
-A. Can I have your pen ? 
-B. Here you go 
+🔹 Here you go — this is what you wanted
+A: Can I have your pen?
+B: Here you go.
 
-
-
-
-3. Not necessary.
-
+🔹 That's not necessary — no need to do that
 A: Should I explain everything in detail?
 B: That's not necessary.
 
-
-4. Hold on -> Wait for a short time.
-
-One moment, please. (most formal)
+🔹 Hold on — wait for a short time
+One moment, please.   (most formal)
 Just a moment.
 Please wait a moment.
-Give me a moment. (less formal than the above)
+Give me a moment.      (less formal)
 
+🔹 I decided — when you've already made a choice
+Since UPI and NEFT have different behaviour, I decided to make them the same.
 
-5. I decided -> When you've already made a choice.
-
-Since UPI and Neft have different behaviour, I decided to make them same
-
-
-6. Let me do it by myself -> Let me do it without anyone's help.
-
+🔹 Let me do it by myself — without anyone's help
 A: Should I fix your laptop?
 B: No, thanks. Let me do it by myself.
 
-
-7. By the way -> "By the way" = "Oh, one more thing...". Used to introduce a new or related topic without changing the conversation abruptly.
-
+🔹 By the way — "Oh, one more thing…"
+Introduces a new/related topic without changing the conversation abruptly.
 By the way, I sent you the email yesterday.
 
-
-8. Can you spare a minute 
-
+🔹 Can you spare a minute — do you have a little time?
 Can you spare a minute to review my code?
 
-9. Either -> Also not / one or the other (depends on the context).
-
-Too → Positive sentences.
-I like coffee. I like tea too.
-Either → Negative sentences.
-I don't like coffee. I don't like tea either.
-
-
-10. Exactly = “That is correct / precisely”
-Use it when agreeing with or confirming someone's statement.
-
-Example:
-
-A: So the issue is because the webhook isn't reaching our server?
-B: Exactly.
-
-A: You mean the payment is already verified?
-B: Exactly.
-
-
-2. Certainly = “Yes, definitely / of course”
-
-Use it when agreeing to do something or confirming that something can be done. It is more formal than “sure.”
-
-Example:
-
-A: Can you check this?
-B: Certainly.
-
-A: Can you deploy this today?
-B: Certainly, I'll take care of it.
-
-Indeed = “Yes, that is true”
-
-Use it when strongly agreeing with or confirming a fact. It sounds more formal and is less common in casual workplace chat.
-
-Example:
-
-A: This is a production issue.
-B: Indeed.
-
-A: The implementation is more complex than expected.
-B: Indeed, it is.
-
-| Word           | Meaning                          | Use it when                                      | Example                                                    |
-| -------------- | -------------------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
-| **Exactly**    | “That’s precisely correct.”      | Someone has correctly understood something       | “So the issue is with the webhook?” → **Exactly.**         |
-| **Certainly**  | “Yes, definitely / of course.”   | Someone asks you to do something                 | “Can you check this?” → **Certainly.**                     |
-| **Indeed**     | “Yes, that is true.”             | Confirming a fact; sounds more formal            | “This is a complex flow.” → **Indeed.**                    |
-| **Agreed**     | “I agree with this.”             | Agreeing with a suggestion, opinion, or decision | “We should discuss this with the client.” → **Agreed.**    |
-| **Absolutely** | “Definitely / completely agree.” | Strongly agreeing or confirming                  | “This needs to be fixed before release.” → **Absolutely.** |
-
-
-Exactly. → I completely agree. ✅
-Okay. → I understand / I accept the plan. ✅
-Sure. → I'm willing to do it. ⚠️ (Less natural here unless you're responding to a request.)
-Certainly. → Yes, I'll do it. ⚠️ (Used mainly when someone asks you to do something.)
-
-
-Quick tip:
-
-Exactly = Agreement.
-Okay = Acceptance.
-Sure / Certainly = Response to a request.
-
-
-11. Since when did you...? 
-Asking from what time someone started doing something. It can also express surprise.
-
+🔹 Since when did you…? — from what time did you start? (can show surprise)
 A: I love horror movies.
 B: Since when did you like horror movies?
 
 
-12. Although: In spite of the fact that
+━━━━━━━━━━━━━━━ ✅ Agreement & Confirmation Words ━━━━━━━━━━━━━━━
+
+🔹 Exactly — "That's precisely correct"
+Use when agreeing with or confirming someone's statement.
+A: So the issue is because the webhook isn't reaching our server?
+B: Exactly.
+
+🔹 Certainly — "Yes, definitely / of course" (more formal than "sure")
+Use when agreeing to do something.
+A: Can you deploy this today?
+B: Certainly, I'll take care of it.
+
+🔹 Indeed — "Yes, that is true" (formal, confirming a fact)
+A: The implementation is more complex than expected.
+B: Indeed, it is.
+
+🔹 Quick reference
+  Word        | Meaning                     | Use it when
+  ----------- | --------------------------- | ---------------------------------
+  Exactly     | That's precisely correct    | Someone understood correctly
+  Certainly   | Yes, definitely / of course | Someone asks you to do something
+  Indeed      | Yes, that is true           | Confirming a fact (formal)
+  Agreed      | I agree with this           | Agreeing with a suggestion
+  Absolutely  | Definitely / completely     | Strongly agreeing or confirming
+
+🔹 Agreement vs acceptance vs response
+Exactly.   -> I completely agree.                ✅
+Okay.      -> I understand / I accept the plan.  ✅
+Sure.      -> I'm willing to do it.              ⚠️ (response to a request)
+Certainly. -> Yes, I'll do it.                   ⚠️ (when someone asks you)
+
+💡 Tip:  Exactly = agreement · Okay = acceptance · Sure/Certainly = response to a request.
+
+
+━━━━━━━━━━━━━━━ 🔀 Contrast Connectors ━━━━━━━━━━━━━━━
+
+🔹 Although — in spite of the fact that
 Although it was raining, we went out.
 
-
-13. Even though: Despite the fact that (strongest contrast).
+🔹 Even though — despite the fact that (strongest contrast)
 Even though it was raining heavily, we went out.
 
 
-14. Yet: Until now (usually in negative sentences and questions).
+━━━━━━━━━━━━━━━ ⏳ Yet vs Still ━━━━━━━━━━━━━━━
+
+🔹 Yet — until now (usually negatives & questions)
 I haven't heard this song yet.
-The food is not arrived yet.
+The food hasn't arrived yet.
 
-
-15. Still: Something continues to be true.
+🔹 Still — something continues to be true
 Are you still awake?
-Its 10PM already, the food is still not here.
+It's 10 PM already, and the food is still not here.
 
 
-16. Would have: Something that would have happened, but didn't.
+━━━━━━━━━━━━━━━ 🕰️ Modal Perfect (would/could/should have) ━━━━━━━━━━━━━━━
+
+🔹 Would have — would have happened, but didn't
 I would have helped you if I had known.
 
-
-17. Could have: Something was possible, but didn't happen.
+🔹 Could have — was possible, but didn't happen
 She could have become a doctor.
 
-
-18. Should have: Something was the right thing to do, but didn't happen (often regret or criticism).
+🔹 Should have — was the right thing to do, but didn't happen (regret / criticism)
 You should have told me earlier.
 
 
-19. Either: One of two / also (in negative sentences).
+━━━━━━━━━━━━━━━ ➕ Either / Neither / Too / Rather ━━━━━━━━━━━━━━━
+
+🔹 Too — in positive sentences
+I like coffee. I like tea too.
+
+🔹 Either — in negative sentences ("also not")
 I don't like coffee. I don't like tea either.
 
-
-20. Neither: Not one and not the other.
+🔹 Neither — not one and not the other
 A: I don't smoke.
 B: Neither do I.
 
-
-21. Rather: Preference / to some extent.
+🔹 Rather — preference / to some extent
 I'd rather stay home.
-
