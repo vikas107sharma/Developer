@@ -1,0 +1,88 @@
+================================================ Step 1 ================================================
+
+Your 90-second answer
+
+“I worked on the customer-facing side of collections and cheque recovery. Retailers receive WhatsApp notifications about their payments, and those messages can contain generated financial documents.
+
+There are three main flows. First is normal collection — once a salesman's payments are fully verified, retailers receive a payment receipt showing what they paid and their remaining outstanding. Second, when a cheque bounces, we send a proforma invoice for the ₹500 bounce charge. Third, when that charge is actually recovered, we generate a GST tax invoice through ClearTax with an IRN and signed QR code.
+
+The collection flow had an interesting consistency problem. Cashier verification happens payment by payment, and a collection can become fully verified over multiple days. So sending a notification on every verification event could expose incomplete outstanding amounts or send duplicates. The design uses an event as a signal and derives the actual eligibility from current database state. A cron sweep provides a fallback if the event path fails.
+
+The hardest technical problem was GST calculation. The ₹500 bounce charge is GST-inclusive, but the government portal validates both the individual 9% CGST/SGST calculations and the final total. Simple gross / 1.18 rounding can create a one-paisa mismatch and reject the invoice. So I implemented a bounded Decimal-based search around candidate taxable values and selected one satisfying both constraints exactly.
+
+Kafka then decouples the eligibility decision from document generation, S3, ClearTax and WATI.”
+
+
+================================================ Step 2 ================================================
+
+“Explain the collection notification flow.”
+
+“There are two paths.
+
+The primary design was event-driven. When the cashier verifies a payment, we publish a Kafka event containing the salesman and collection date.
+
+But the event doesn't contain the invoices to send. It only says: something changed for this salesman on this date.
+
+The consumer then queries the current database state and checks whether that salesman-day is actually eligible.
+
+We also have a cron sweep running the same eligibility logic. Its job is to recover cases where the event wasn't delivered or wasn't processed successfully.
+
+Both paths converge on the same eligibility query and notification log, so whichever path gets there first sends the notification and the other becomes a no-op.”
+
+
+================================================ Step 3 ================================================
+If they ask:
+
+“Why not just send the notification directly from the verify API?”
+
+Your answer:
+
+“Because verification isn't equivalent to completion.
+
+The application can call verification multiple times, and a collection can have multiple payments verified independently. If I use the individual verification event as the trigger and trust its payload, I can send a receipt while the collection is still partially verified.
+
+So the event only identifies the affected salesman-day. The consumer derives eligibility from current state.”
+
+Then example:
+
+“Suppose there are four payments. Two are verified today and two three days later. We don't want two receipts. The first two days fail the all-verified condition. Once the fourth payment is verified, the sweep sees the entire salesman-day as complete and sends one receipt containing all four payments.”
+
+================================================ Step 4 ================================================
+
+“There are two possible producers of the same notification — the event path and the fallback sweep — so idempotency has to be shared.
+
+The eligibility query checks for an existing successful notification using NOT EXISTS.
+
+We also create a pending notification log before sending and update it after the provider call.
+
+So the database log is effectively the coordination point between the two paths.”
+
+
+================================================ Step 5 ================================================
+
+If the interviewer asks about extensibility:
+
+“The consumer receives different notification keys, and NotificationService maps those keys to strategy-specific payload builders and shapes.
+
+Collection notifications operate on a list and aggregate by customer; cheque notifications operate on a single cheque.
+
+Adding a notification therefore doesn't require modifying the producer-consumer pipeline — it's essentially a new key, payload builder and strategy mapping.”
+
+================================================ Step 5 ================================================
+
+⭐ The bug you SHOULD volunteer
+
+“There's one real bug I'd fix first. In the Kafka consumer's exception handler, the code logs the exception and still commits the message.
+
+That means a processing failure can mark the Kafka message consumed, so Kafka won't retry it and there's no DLQ.
+
+For collection notifications, the cron fallback partially protects us because a failed send leaves the notification unsuccessful and the next sweep can pick it up.
+
+But cheque notifications don't have that fallback, so a failed event can genuinely be lost.
+
+I'd stop committing failed messages and add a dead-letter topic with controlled retries.”
+
+
+Questions: 
+1. Design patterns used in notification system 
+2. Do we really need DLQ ? 

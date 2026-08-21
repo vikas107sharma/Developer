@@ -1,0 +1,70 @@
+================================================ Step 1 ================================================
+
+The 60-second version
+
+“I worked on the inventory side of the Promise Engine at Supertails. The Promise Engine needs warehouse inventory to calculate whether we can promise a particular delivery date.
+
+Originally inventory came from the ERP through a five-minute cron snapshot. That meant the delivery system could be working with stale inventory for several minutes.
+
+I added a realtime webhook path where the ERP sends inventory changes. Instead of making the webhook synchronously write to MySQL, I validate the request, publish it to Pub/Sub and return 202. A subscriber performs the database write asynchronously.
+
+We kept the cron because realtime events are not the correctness guarantee — the periodic snapshot reconciles the state.
+
+The interesting bug was that the cron and webhook used the same writer even though their payload semantics were different. The cron sends a full snapshot, while the webhook sends only changed warehouses. The writer treated a warehouse missing from a delta as quantity zero and could overwrite inventory for a warehouse that never changed.
+
+I fixed that by explicitly distinguishing ‘warehouse genuinely has zero inventory’ from ‘this warehouse wasn't present in the delta’, so the delta skips that update while the snapshot behaviour remains unchanged.”
+
+We already had a cron-based inventory sync running every 5 minutes, but we moved toward realtime sync for two reasons: the inventory was not truly realtime, and we had a restriction against vertically scaling the server running the sync. Each page was large (~4.2 MB, ~4,794 items, ~127 warehouses) and could consume ~150–200 MB on a 256 MB instance, leaving very little headroom and causing crashes under additional load. Splitting the existing 5 pages into more pages reduced the payload size per page, but it only addressed memory pressure—it didn't solve the fundamental 5-minute freshness problem.
+
+
+================================================ Step 2a ================================================
+“What was the hardest bug?”
+
+Both paths wrote through the same function. That felt like good design — one writer, one place for the SQL. It was actually the bug.
+
+The cron sends a full snapshot: every item carries every warehouse. The webhook sends a delta: each item carries only the warehouses that changed. The writer built a union of every warehouse name in the batch, then for each warehouse wrote a row for every item.
+
+So say SKU A changed in Bangalore and SKU B changed in Delhi. The union is {Bangalore, Delhi}. When it writes the Delhi column, it looks up SKU A's Delhi quantity — SKU A never mentioned Delhi — so it defaults to zero. And it writes that zero.
+
+A realtime inventory update was silently zeroing stock for unrelated SKUs. No exception, no error log, query succeeded. It just wrote the wrong number. Downstream, zero stock means the Promise Engine believes the item is unavailable — so we stop promising a delivery date on inventory we actually have.
+
+“The problem wasn't code reuse. The problem was sharing a writer between two callers whose data contracts were different.”
+
+================================================ Step 2b ================================================
+Second Bug (Here I have learnt how pub/sub actually works)
+
+When it was deployed to production, the same subscriber was created there. Since the name was the same, Pub/Sub considered them the same worker and sent each message to only one subscriber.
+
+             Topic
+     real_time_inventory_sync
+                    |
+            Subscription
+     real_time_inventory_sync-sub
+               /         \
+              /           \
+     Prod Consumer   Staging Consumer
+
+While fixing it on staging, I created a new subscriber, `real_time_inventory_sync-staging-sub`.
+
+Now Pub/Sub has two subscribers: `real_time_inventory_sync-sub` and `real_time_inventory_sync-staging-sub`. Since the names are different, Pub/Sub treats them as separate subscribers and sends the message to both.
+
+Since the topic is the same, if someone uses a correct warehouse and skuCode while testing on staging, the message is sent to both subscribers and wrong inventory can get updated in the production database.
+
+
+================================================ Step 3 ================================================
+Pub/Sub duplicate messages
+
+I deliberately not kept a dead-letter queue because it was adding unnecessary complexity.
+
+The more important concern is out-of-order delivery of different inventory deltas. For example, if quantity 10 is followed by quantity 5, and the 10 event fails and gets requeued, the 5 event may be processed first. When the 10 event is retried, it could overwrite the latest quantity and incorrectly set it back to 10.
+“If a webhook gets lost, delayed, duplicated or processed out of order, the periodic snapshot eventually reconciles the inventory.”
+
+
+================================================ Step 4 ================================================
+Why pub sub instead of other message queue (RabitMQ)
+
+For this workload, RabbitMQ could actually be a better fit because it provides more application-level control over retries, backoff, acknowledgements, and dead-lettering.
+
+Pub/Sub was chosen mainly because it was already part of the GCP stack, so it provided a simple event-bus and decoupling layer without introducing another infrastructure component.
+
+If designing this from scratch specifically for this workload, RabbitMQ would definitely be worth considering.

@@ -15,6 +15,27 @@ getUser(id, (err, user) => {
   getOrders(user.id, (err, orders) => { /* ... */ });
 });
 
+// 1. Get user -> 2. Read file -> 3. Send email -> 4. Log to DB
+db.query('SELECT * FROM users WHERE id = 1', (err, user) => {
+    if (err) return res.status(500).send('DB Error');
+
+    fs.readFile('/templates/welcome.txt', 'utf8', (err, template) => {
+        if (err) return res.status(500).send('FS Error');
+
+        const emailBody = template.replace('{{name}}', user.name);
+        
+        emailService.send(user.email, emailBody, (err, response) => {
+            if (err) return res.status(500).send('Email Error');
+
+            db.query('UPDATE users SET email_sent = 1 WHERE id = 1', (err, result) => {
+                if (err) return res.status(500).send('DB Update Error');
+                
+                res.status(200).send('Success');
+            });
+        });
+    });
+});
+
 
 2. Promises (Reclaiming Control)
 A Promise solves this by returning a stateful object—pending, fulfilled, or rejected—that acts as a proxy for a future value.
@@ -98,3 +119,65 @@ const data = await Promise.race([
   fetchData(),
   timeout
 ]);
+
+
+━━━━━━━━━━━━━━━ 🌍 Call, apply and bind ━━━━━━━━━━━━━━━
+
+
+━━━━━━━━━━━━━━━ Closure ━━━━━━━━━━━━━━━
+A closure happens when an inner function references variables declared in its outer function.
+
+Normally, when a function finishes executing, its local variables are popped off the call stack and garbage-collected.
+
+However, if an inner function still holds a reference to those variables, the V8 engine moves them from the stack to the heap, keeping them alive.
+The inner function remembers its lexical environment.
+
+Example:
+Why this is good: It prevents you from hardcoding business logic inside the route handler or relying on global variables. The configuration is injected once and retained in memory.
+
+// The outer function takes the configuration (allowedRole)
+const authorizeRole = (allowedRole) => {
+    
+    // The inner function is the actual Express route handler.
+    // It forms a closure over 'allowedRole'.
+    return (req, res, next) => {
+        const userRole = req.user.role; 
+
+        if (userRole !== allowedRole) {
+            return res.status(403).json({ error: `Requires ${allowedRole} access.` });
+        }
+        
+        next();
+    };
+};
+
+// 'adminAuth' is now a function that will forever remember allowedRole = 'admin'
+const adminAuth = authorizeRole('admin');
+const salesAuth = authorizeRole('sales_officer');
+
+app.post('/api/settle-cheque', salesAuth, controller.settleCheque);
+
+
+Memory Leaks Due to Closures
+Because closures prevent the Garbage Collector (GC) from clearing captured variables, they are a primary source of memory leaks in long-running Node.js processes.
+
+
+Why does Closure exist?
+Without closures, asynchronous programming in Node.js would be impossible. When you make a database query and pass a callback, that callback is executed seconds later in a completely different tick of the event loop. If closures didn't exist, the callback would have no way to remember the req or res objects from the original request scope to send the data back to the user.
+
+// OUTER FUNCTION (Route Handler)
+app.get('/user/:id', (req, res) => {
+    const userId = req.params.id;      // Local variable in outer function
+    const requestTime = Date.now();    // Local variable in outer function
+
+    // INNER FUNCTION (Database Callback)
+    const dbCallback = (err, userData) => {
+        // Look where these 3 variables came from:
+        if (err) return res.status(500).send('Error'); // 'res' is from the outer scope!
+        
+        const duration = Date.now() - requestTime;     // 'requestTime' is from the outer scope!
+        res.json({ data: userData, duration, requestedId: userId }); // 'userId' is from the outer scope!
+    };
+
+    db.query('SELECT * FROM users WHERE id = ?', [userId], dbCallback);
+});
