@@ -1,0 +1,137 @@
+# MyDesignation — Project Story
+
+## 1. Introduction
+
+MyDesignation is a live D2C apparel brand running on Shopify (www.mydesignation.com).
+
+The **website** is a Shopify Liquid theme. It has no backend of its own — the theme
+talks to Shopify directly, and every extra feature (reviews, size charts, bundles,
+loyalty, tracking) is a Shopify app injected into the page.
+
+We are building a **native mobile app** that has to match the website feature for
+feature. An app cannot work the way a Liquid theme works, so unlike the website,
+the app has a backend: **mydesignation-backend**, a Backend-for-Frontend (BFF)
+that sits between the app and Shopify.
+
+I designed and built that backend.
+
+
+## 2. Description — what the BFF actually does
+
+Shopify stays the **system of record** for catalog, orders and customers. The BFF
+never duplicates that data. It does four things:
+
+1. **Aggregates.** One app screen becomes one BFF call, and the BFF fans out to
+   Shopify Storefront/Admin GraphQL and merges the result. The app never makes six
+   calls to paint a home screen.
+2. **Orchestrates third parties.** What the website gets from Shopify apps in the
+   browser, the app gets from the BFF server-side: Judge.me (reviews), Kiwi Sizing
+   (size charts), Easy Bundle (bundle builder), Nector (loyalty), ClickPost
+   (shipment tracking), Razorpay (payments), MSG91 (OTP).
+3. **Owns app-only data.** Sessions, verified identifiers, OTP codes, payment/order
+   correlation, tracking events, wishlist preferences, app config, pincodes. That is
+   the entire Postgres schema — nothing Shopify already stores.
+4. **Protects the upstream.** Shopify's API is rate-limited and cost-based. Caching
+   and batching are not optimisations here; they are what keeps the app inside
+   someone else's quota.
+
+**Shape:** 18 modules, ~84 REST endpoints, two processes built from one image —
+`server.ts` (HTTP API) and `worker.ts` (queue poller). Layered
+routes → controller → service → gateway, with every vendor SDK quarantined inside
+`gateways/` and `infrastructure/` so no business module ever imports one directly.
+
+
+## 3. The tech stack, and why each piece
+
+| Choice | Why |
+|---|---|
+| **Node.js 24 + TypeScript + Express 5** | The job is almost pure I/O orchestration — fan out to Shopify and 6 third parties, merge, respond. No CPU-bound work, so an event loop is the right model. TypeScript because the whole value of a BFF is a stable contract for the app; types are that contract. |
+| **PostgreSQL + Prisma 7** | Chose Postgres over MySQL deliberately for a schema holding payments: **partial unique indexes** (the COD claim below is one line of SQL in Postgres and impossible in MySQL), **jsonb** for raw webhook bodies and frozen address snapshots, **real enum types**, and **transactional DDL** so a failed migration rolls back clean. Prisma for typed queries against a small, well-known schema. |
+| **Redis (ioredis)** | Read-through cache for Shopify reads, plus rate limiting, OTP resend cooldowns and verify-attempt counters. One instance, but **different failure policies per use**: content reads degrade to the loader, security gates fail open. |
+| **AWS SQS + a worker container** | Webhooks (Razorpay payments, ClickPost scans) must not be processed inside the HTTP request. SQS gives durability, a visibility timeout, and DLQ redrive with no broker to operate — the three things this workload actually needs. |
+| **AWS S3 presigned URLs** | Review-image uploads go straight from the app to S3; the BFF only signs. No image bytes through the API. |
+| **Shopify Storefront + Admin GraphQL** | Storefront for anything customer-facing; Admin only where Storefront can't reach (discounts, some metaobjects). Batched `nodes(ids:)` reads instead of per-item fan-out. |
+| **Razorpay (native)** | Payments, prepaid + COD. Pivoted to the native SDK flow after Magic Checkout was dropped. |
+| **Zod** | Validates the whole environment at boot and `process.exit(1)` on failure — a missing secret fails at startup, not at the first customer request. Also validates request bodies. |
+| **pino** | Structured JSON logs, so production debugging is a CloudWatch query rather than reading text. |
+| **jose** | JWT signing/verification for stateless access tokens. |
+| **Vitest** | ~93 test files. Tests never touch a real database — the Prisma client is an in-memory fake, a hard rule after a staging DB was once wiped by a test. |
+| **Docker Compose on AWS** | One image, two commands (API and worker). EC2 + RDS Postgres behind an ALB. |
+
+
+## 4. The story — the four problems that shaped the design
+
+### Exactly-once order creation
+Two completely independent writers race to create the same Shopify order: the app's
+own payment-verify call, and Razorpay's webhook. Either can arrive first, and both
+can arrive. A duplicate order is the worst possible bug — a customer charged once,
+billed twice.
+
+So one Postgres row per checkout attempt is the single source of truth. Claiming it
+is a **conditional UPDATE**, and the *rows-affected count* is the answer: 1 means
+"I won, I must create the order", 0 means "someone already did". The payment id and
+Shopify order id columns are `UNIQUE`, so even on an exact tie the database rejects
+the second writer and I treat that violation as "lost the claim". The database
+decides the winner, never application logic. For COD, a **partial unique index** on
+the cart — unique only while the attempt is live — makes a double-tap a no-op while
+letting a *failed* attempt fall out of the index so the customer can retry.
+
+### Caching that can't lie
+Every Shopify read is cached read-through in Redis with a TTL chosen per key family
+and justified in a comment above the number. Freshness comes from Shopify webhooks
+where possible; the TTL is only a safety net for a delivery that failed.
+
+Two things made it safe rather than just fast. **Stampede protection** in two layers:
+concurrent misses inside a container share one in-flight promise, and across
+containers a short `SET NX` lock means only one process runs the loader while the
+others briefly wait for its result. And a hard rule — **the cache is an optimisation,
+never a dependency**: every Redis call is wrapped and falls through to the loader, and
+the client is tuned to fail *fast*, because a hanging Redis is far worse than an
+absent one.
+
+That rule was written in blood. A size-chart endpoint once returned "no chart" for a
+product that had one, for nearly an hour, silently. The upstream gateway collapsed a
+transient failure to `null`, and the cache faithfully stored that `null` for the full
+TTL. The bug was at the seam: `null` meant both "genuinely nothing" and "I failed to
+find out". Now failures are never cached — negative caching has to be an explicit
+sentinel, not an accident.
+
+### One account per human
+Login is passwordless: phone OTP, email OTP, Google, or Apple. The hard part isn't
+issuing a token, it's deciding what happens when someone signs in with Google using
+an email that a phone-OTP account already owns. The rule is **never merge**: a
+verified identifier belongs to exactly one account, enforced by a database unique
+constraint so the attach-or-block decision is race-free rather than a read-then-write.
+One deliberate exception — a phone number scraped from Google's People API is not
+proof of ownership, so a genuine phone OTP can reclaim it. Otherwise a recycled
+number could permanently lock out its real owner.
+
+Sessions use rotating refresh tokens grouped into **families**: replaying a token
+that was already consumed means it leaked, so the whole family is revoked.
+
+### Webhooks off the request path
+The endpoint does only what must be synchronous — verify the HMAC against the raw
+bytes, enqueue, return 200 — usually in single-digit milliseconds. All real work
+happens in the worker. Senders retry on any non-2xx, so slow inline processing
+invites duplicate deliveries; the only 5xx I return is when the *enqueue* itself
+fails, because then I genuinely haven't processed it and I want the retry.
+
+Settlement is explicit: delete the message on success, leave it on failure so it
+reappears after the visibility timeout and eventually dead-letters. Because both
+processors are idempotent and order-tolerant by design, a **standard** (cheaper,
+non-FIFO) queue is provably safe — I didn't have to pay for ordering I'd already
+made unnecessary.
+
+
+## 5. The one-paragraph version
+
+> MyDesignation's website is a Shopify Liquid theme with no backend. I built the
+> Backend-for-Frontend that lets a native mobile app offer the same features — a
+> Node/TypeScript service on Postgres and Redis that aggregates Shopify GraphQL into
+> one call per screen, orchestrates six third-party integrations server-side, and owns
+> only the data Shopify doesn't. The interesting parts were correctness under
+> concurrency, not throughput: guaranteeing exactly one order when a payment webhook
+> and the app's own verify call race for it, a cache that degrades instead of lying
+> when Redis or an upstream fails, and a passwordless identity model where one
+> verified phone or email maps to exactly one account, enforced by the database
+> rather than by application logic.

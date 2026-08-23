@@ -1,0 +1,55 @@
+================================================ Step 1 ================================================
+
+The 30-second skeleton
+
+We automated the ingestion of brand adjustment files. A brand uploads a spreadsheet containing credit notes and cash discounts, and the system processes it automatically into our financial ledger.
+
+The difficult part was that every brand had a different file format, a single upload could contain 15,000+ rows, and every brand's file looks completely different — different headers, different column names, some ship one row per adjustment, some ship ten line-items that have to be summed, some ship one row that has to be split into two different adjustment types.
+
+Every row is a financial write across four to six tables, so basically it's not an import — it's 15,000 small transactions.
+
+The money I'm reducing has often already been promised to someone who's out in the field right now trying to collect it.
+
+I built the pipeline around S3, Lambda and Kafka, processing each row independently so failures could be isolated and the workload could scale.
+
+The result was a fully automated ingestion flow that could safely process large files without manual intervention.
+
+================================================ Step 2 ================================================
+
+The interviewer asks: "How does the architecture work?"
+
+Now expand:
+S3 → Lambda → Kafka → Processor → DB
+
+“I deliberately made the row the unit of work instead of the entire file. A 15K-row file shouldn't behave like one giant transaction. If one row fails, I don't want 14,999 successful rows blocked.”
+
+================================================ Step 3 ================================================
+
+They ask: "How did you handle different Excel/CSV formats?"
+
+“Each brand and adjustment type had configuration defining how columns should be mapped and transformed. The parser was an ordered pipeline — header detection, cleaning, validation, filtering, aggregation, post-aggregation filtering, type conversion and expansion.”
+
+Then give one concrete example:
+“For example, one brand could send multiple line items for the same credit note, so we had to aggregate them. Another could put two adjustment types in one row, so we had to expand that row into two financial adjustments.”
+
+
+================================================ Step 4 ================================================
+
+“I didn't drop failed rows from Kafka because file completion depended on every row reaching a terminal state. A failed row still goes through the pipeline, but the processor short-circuits it. Otherwise a file could remain stuck at 99% forever.”
+
+================================================ Step 5 ================================================
+
+They ask: "What happens when processing one row?"
+This is where you demonstrate that this wasn't a simple CRUD import.
+
+
+Say:
+
+“A row goes through business validation against live financial state before anything is written. We check whether the invoice exists, whether delivery is complete, whether the adjustment was already accounted for, whether it falls within the applicable reconciliation rules, and whether the adjustment would make the invoice invalid.
+
+Once validated, the operation updates several related financial records inside a transaction.”
+
+
+Then give one interesting example:
+
+“For example, reducing the invoice outstanding wasn't sufficient. An invoice could already be assigned to one or more salesmen for collection. So the adjustment also had to propagate to those outstanding assignments to keep the collection system consistent.”

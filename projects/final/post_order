@@ -1,0 +1,88 @@
+Post-Order Journey — 2-Minute Interview Version
+
+When an order is placed, Shopify sends a webhook to our service. We skip service-only orders like vet or grooming orders, then call our Promise Engine, which tells us how the order should be split into shipments — which items go together, which warehouse handles them, and the expected delivery date.
+
+We store this in MongoDB as one order document. The lineItems represent what the customer bought, while shipments represent how those items will actually be delivered. Initially, the shipment has the promise information, but tracking is empty because we don't know the courier or waybill yet.
+
+As the order progresses, the ERP sends delivery notes, which tell us what the warehouse actually packed. We reconcile that with our planned shipments. If something doesn't match, we don't delete the old shipment — we mark it as mismatched, so we preserve the history but don't show it to the customer.
+
+Then courier webhooks, mainly from ClickPost, continuously update the tracking information and tracking history for the correct shipment.
+
+The interesting part was actually the read side.
+
+We exposed three APIs: order list, order details, and shipment tracking. Mongo gives us the shipment and tracking information, but the customer-facing response requires data from roughly ten different sources.
+
+For example, Shopify provides product information and fulfillment data, the returns system provides returned quantities and refunds, another source provides revised delivery dates, the pharmacy system provides prescription status, another handles failed-delivery or NDR information, and the pricing service provides dynamic fee names.
+
+So the backend has a fan-in layer that collects all this information and converts technical statuses into customer-friendly responses like “Arriving by Tomorrow 10 PM” or “Missed delivery on Wednesday.”
+
+The biggest performance concern was avoiding N+1 queries. Instead of querying every shipment individually, I collect all order IDs or waybills first and perform batched queries — one query per downstream source.
+
+There were also some tricky business cases. For returns, I had to reduce the outbound quantity and create a separate return shipment without double-counting when Shopify splits the same item across multiple fulfillments. For COD, if one order becomes multiple shipments, the payable amount has to be allocated across shipments while making sure the total still exactly matches the order amount.
+
+The biggest engineering challenge wasn't creating the Mongo document. It was assembling a consistent customer-facing view from multiple systems that each own a different part of the order lifecycle.
+
+
+
+
+
+THE PIPELINE (draw this — it does half the work for you)
+-------------------------------------------------------
+
+  Shopify order webhook  ──►  POST /webhook/post-order/edd-actions
+                                │   EddActionsV2()
+                                │   guard: service-only orders (vet/grooming) skipped
+                                │
+                                ├──GET /v2/cartedd──►  PROMISE ENGINE (separate microservice)
+                                │◄── shipmentInfo[] + per-SKU EDD ──┘
+                                │
+                                ├──►  orderPromises collection
+                                │     (raw response archived — on SUCCESS *and* FAILURE)
+                                ▼
+                          orders document (one per order)
+                            lineItems[]   ← Shopify         (what was bought)
+                            shipments[]   ← promise engine  (how it ships)
+                               promise{}   [FILLED]   warehouse, deliveryType,
+                                                      deliveryDateTime, dayCount, cutoff
+                               tracking{}  [ALL NULL]  waybill, courier, deliveryNote,
+                                                      status, trackingHistory: []
+                                │  sendEddToERP()
+                                ▼
+  ERP delivery note  ──────►  POST /erp-delivery-notes  → raw dump to erpDeliveryNotes
+                              deliveryNoteWebhook.js    → RECONCILE vs planned shipments
+                                                          fills deliveryNoteNumber
+                                                          creates unpredicted shipments
+                                                          tombstones stale plans (mismatched)
+                                ▼
+  Clickpost courier webhooks ►  updateTrackingStatus()
+                                fills tracking.status, appends trackingHistory[]
+                                targets ONE shipment via positional arrayFilters
+
+
+READ SIDE — one screen, ten sources  (THIS IS THE HARD PART)
+
+   /post-order/list          /post-order/details        /post-order/shipment
+   (orders page)             (one order)                (one parcel)
+        │                          │                          │
+        └──────────────────────────┴──────────────────────────┘
+                                   │
+                   formatPostOrderShipmentData()  ← ~1900-line fan-in layer
+                                   │
+    ┌──────────┬──────────┬────────┼────────┬──────────┬──────────┬─────────┐
+ Shopify     Mongo     Returns  revised_edd  COD→      Pharmacy   NDR /   Pricing
+ GraphQL     orders   (Clickpost)            prepaid   (Rx)      failed_   service
+    │          │          │          │          │        │      deliveries    │
+ header,   shipments,  per-SKU    override   payment   hide     reschedule  dynamic
+ variants, promise,    return     the        mode      unreleased inputs    fee titles
+ images,   tracking,   status,    promised   flip      Rx items  + attempt  + tooltips
+ fees,     history     refunds    date                          history    (ocv gate)
+ fulfil-
+ ments
+                                   │
+                                   ▼
+                    ONE response — every field a human sentence
+                    "Arriving by Tomorrow 10PM ⚡️"
+                    "Delivered on Tue, 3rd Sep"
+                    "Missed delivery on Wed, 4th Sep"
+                    + rider name/phone, cancellable flag, fee rows,
+                      per-shipment COD amount due

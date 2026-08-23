@@ -1,0 +1,98 @@
+================================================ Step 1 ================================================
+
+“It's a field cash-collection system for an FMCG distributor. A salesman is assigned invoices, visits stores and collects payments through cash, cheque, UPI or NEFT. He submits the collection, then a segregator and cashier verify it. Either one can reject it.
+
+The interesting part is that rejection doesn't mean simply submitting again. The behavior depends on who rejected it. A segregator rejection reopens the entire submission, so the salesman can add, remove or modify payments. A cashier rejection is much more restrictive — only the rejected payment can be edited, and the server determines whether the salesman can change the amount, cheque details, either, or nothing.
+
+Because payments are allocated across multiple invoices, a resubmit doesn't update the existing payment rows. We rebuild the payment set from scratch. That created the main engineering problem: preserve the cashier's previous verification and settlement information while rebuilding the current payment rows, and maintain a complete history of what changed.
+
+So the core of what I worked on was really the rejection-and-resubmission workflow and keeping the financial state consistent through it.”
+
+
+================================================ Step 2 ================================================
+
+The ⭐ strongest card — rejection behavior
+“What was technically challenging?”
+
+“The hardest part was that rejection wasn't a single state.
+
+If the segregator rejects, the submission effectively becomes editable again. The salesman can add new payments, remove payments or change existing payments.
+
+But if the cashier rejects, we can't reopen everything because the cashier may already have verified the other payments. So only the rejected payment can be modified, and even that is restricted by the rejection reason.
+
+For example, EDITAMOUNT allows changing only the amount. Cheque number and bank details remain frozen. EDITDATA does the opposite. EDITAMOUNTORDATA allows either, and SETTLE blocks editing completely.
+
+And importantly, this isn't just enforced by the frontend. The backend validates the payment state before accepting the request.”
+
+
+================================================ Step 3 ================================================
+
+The ⭐ second strongest card — why delete and insert?
+“Why didn't you just update the payment rows?”
+
+“Because the payment rows don't represent an independent stable entity during resubmission.
+
+One payment submission can be distributed across multiple invoices. If the salesman changes one amount, the entire allocation can change — a payment can move from one invoice to another or be split across invoices.
+
+So instead of trying to calculate every possible update, we tear down the current allocation and rebuild it from the new submission.
+
+But we don't lose history. master_payments is effectively versioned. Every edit creates a new row pointing to the previous row through parent_id, so we retain the payment history rather than overwriting it.”
+
+
+================================================ Step 4 ================================================
+
+The payment allocation card
+“How are payments allocated to invoices?”
+
+“The salesman doesn't necessarily pay each invoice separately. He can give one collection bundle — for example ₹40,000 cash, two cheques and one UPI — against eight invoices.
+
+The amortization logic walks the invoices in order and consumes the available money according to a fixed priority: cash, UPI, cheque and then NEFT.
+
+A single payment can be split across multiple invoices. For each invoice, we determine whether the allocated amount settles it, partially covers it and creates a bill back, or exceeds the outstanding and should be rejected.
+
+Finally, all money has to be consumed. If there's leftover money, the submission is invalid.”
+
+================================================ Step 5 ================================================
+
+The duplicate-request card
+“What happens if the salesman submits twice because of a bad network?”
+
+“We hash the payment payload and use Redis to claim the request. If the same submission arrives again while the first one is processing, we reject it as already in progress instead of creating another payment set.
+
+If Redis is unavailable, we allow the request through rather than making Redis a hard dependency for financial collection.”
+
+
+“Isn't that dangerous?”
+“Yes, there's a tradeoff. Redis being unavailable increases duplicate risk. But blocking collections completely because the idempotency layer is unavailable was considered worse for this workflow. The database-side financial validations and transaction boundaries still provide additional protection.”
+
+================================================ Step 6 ================================================
+
+UPI auto-verification card
+“Did you automate anything?”
+
+“Yes. UPI payments could bypass manual cashier verification.
+
+We matched the UPI reference number against the bank statement feed and verified it automatically when the amount matched within the allowed 10-paise tolerance.
+
+If the amount didn't match, we failed it instead of silently accepting it. And if the payment was later removed, we released the bank statement entry so it could be matched again.”
+
+
+================================================ Step 7 ================================================
+
+“The interesting part is the rejection workflow.”
+
+Why rejection is complicated
+        ↓
+Different permissions
+        ↓
+Payments need rebuilding
+        ↓
+Verification must survive
+        ↓
+Need payment version history
+        ↓
+Need correct amortization
+        ↓
+Need idempotency
+        ↓
+Need transaction/locking discipline

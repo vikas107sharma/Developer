@@ -12,6 +12,56 @@ Sits between request/ response cycle
 Middleware set some context to given request (userId, Role, Permission)
 
 
+Middleware executes strictly in the order app.use() or route handlers are defined. Express matches incoming requests top-to-bottom.
+
+Express evaluates paths sequentially. If a route matches, its handler executes. If you forget to call next() or send a response (res.send()), the request hangs indefinitely.
+
+
+
+const express = require('express');
+const app = express();
+
+// 1. Global Logger
+app.use((req, res, next) => {
+  console.log('A: Global Logger');
+  next();
+});
+
+// 2. Auth Middleware
+app.use('/api', (req, res, next) => {
+  console.log('B: API Auth Check');
+  next();
+});
+
+// 3. Async Route Handler
+app.get('/api/resource', async (req, res, next) => {
+  console.log('C: Async Route Handler');
+  try {
+    throw new Error('Database connection failed');
+  } catch (err) {
+    next(err); // Trigger error flow
+  }
+});
+
+// 4. Skipped Middleware (Normal flow bypassed on error)
+app.use('/api', (req, res, next) => {
+  console.log('D: Normal Middleware (Skipped on error)');
+  next();
+});
+
+// 5. Error Handler (Must have 4 params)
+app.use((err, req, res, next) => {
+  console.log('E: Error Handler ->', err.message);
+  res.status(500).send('Handled failure');
+});
+
+// Console Output for GET /api/resource:
+// A: Global Logger
+// B: API Auth Check
+// C: Async Route Handler
+// E: Error Handler -> Database connection failed
+
+
 ✅✅ Before request/ After request ✅✅
 
 import time

@@ -1,0 +1,57 @@
+🥇 CHEQUE BOUNCE MANAGEMENT — Ripplr CDMS
+
+“Cheque Bounce Management isn't really a workflow system. It's a custody and accountability system for money that has already been lost.”
+
+A cheque has bounced. The company has already delivered the goods, but the payment failed.
+
+================================================ Step 1 ================================================
+
+“The project I find most interesting is Cheque Bounce Management.
+
+The core problem wasn't workflow — it was accountability for money that had already been lost. A bounced cheque moves between Cashier, Segregator and Sales Officer, and every handoff creates a period where somebody is responsible for it.
+
+My strongest design decision was the inverted blocker. When A assigns work to B, I create a pending acknowledgement interval. If B doesn't acknowledge within 30 minutes, A gets blocked, not B. The reasoning is that B has little incentive to accept the work, while A has a strong incentive to get it accepted. So I turned an organizational accountability problem into a database predicate.
+
+The second difficult part was payment verification. A collection can contain cash, cheque, UPI and NEFT, and each payment is verified independently. That means a collection can be partially verified, so editability can't be a boolean. It's a matrix of collection verification state × payment state. If previously verified money is edited, its verification is reset, while bank-confirmed UPI/NEFT remains trusted.
+
+I also enforced financial rules such as allowing short-close only when the remaining amount is within the ₹500 bounce charge, while never allowing principal to be written off.
+
+The other technically interesting part was GST e-invoicing, where I had to derive a GST-inclusive breakup that satisfied the government's rounding constraints exactly to the paise.”
+
+There is order blocking if store has 3 cheque bounces within 3 months all the corresponding new orders of that store will be blocked. 
+If the recovery is done then they will be unblocked.
+
+
+
+
+
+
+Cut these from your interview story:
+
+❌ “I created 20+ tables.”
+
+Nobody cares.
+
+It invites:
+
+“Why 20?”
+
+And now you're defending schema count instead of demonstrating engineering judgment.
+
+❌ “I implemented JWT, OTP and RBAC.”
+
+That's a capability inventory.
+
+Not a story.
+
+❌ “I built a state machine.”
+
+Too vague and potentially inaccurate.
+
+Say:
+
+“There are two orthogonal state dimensions plus an accountability lock.”
+
+❌ “I built CRUD APIs for Cashier, Segregator and Sales Officer.”
+
+This makes the project sound trivial.
