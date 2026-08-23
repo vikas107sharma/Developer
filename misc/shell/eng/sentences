@@ -1,0 +1,127 @@
+So, uh, so for the test vet. Whatever we are going to create.
+Regarding the test vet, whatever we create will have no slot limitations.
+
+Uh, for the slots, like you said, nah, there are— if there are two vets.
+Regarding the slots, you mentioned that there are two vets. So, how will the slots be distributed between them?
+
+
+Before speaking, mentally choose one of these:
+
+Statement
+“The issue is that…”
+
+Explanation
+“Basically…”
+
+Clarification
+“Are you saying that…?”
+
+Concern
+“One concern I have is…”
+
+Suggestion
+“I think we should…”
+
+Understanding
+“My understanding is that…”
+
+Conclusion
+“So, the final approach will be…”
+
+
+Take your technical meeting and practice saying:
+“Let me explain my understanding.”
+“The current flow is…”
+“The problem is…”
+“One concern I have is…”
+“Are you saying that…?”
+“If that's the case, then…”
+“I think we should…”
+“The reason is…”
+“So the final flow would be…”
+“Does that sound right?”
+
+
+
+Avoid frequently use "so" to connect everything
+
+Instead, use different connectors:
+
+Cause
+Because / Since
+“Since the webhook can fire multiple times, we need an idempotency mechanism.”
+
+Result
+Therefore / As a result
+“The ID changes every time. As a result, a new ticket is created.”
+
+Contrast
+However / But
+“Redis handles most duplicates. However, it has a TTL limitation.”
+
+Example
+For example / Let's say
+“Let's say the first request arrives at 10 AM.”
+
+
+
+Remove have a habit of starting questions incorrectly
+“Don't we need to, uh, like, add some validation here?”
+
+Asking about behavior
+“What should happen if...?”
+“What should happen if the webhook fires again after 15 minutes?”
+
+Asking about requirements
+“Do we need to...?”
+“Do we need to handle this case separately?”
+
+Asking for confirmation
+“So, are you saying that...?”
+“So, are you saying that all 19 tickets should be created?”
+
+A strong version:
+“The API was called 19 times within three minutes. The titles look similar, but they're actually different because each request contains a different S3 key. So technically, these aren't exact duplicates. We need to confirm whether we should create 19 tickets or treat them as a single ticket.”
+
+
+The biggest improvement I want you to make
+When you're about to speak, don't try to construct the entire paragraph.
+
+Construct only:
+Subject + Verb + Object
+
+For example:
+The webhook fires multiple times.
+
+Then:
+It generates a new grouping ID.
+
+Then:
+That creates a new ticket.
+
+Then:
+So we need an idempotency mechanism.
+
+That's four clean sentences.
+
+Don't try:
+“So basically what happens is that because the webhook can fire multiple times and because we're generating…”
+
+
+Practice this exact exercise
+Take one technical topic and explain it using only these 6 sentences:
+
+The problem is...
+The reason is...
+For example...
+As a result...
+One possible solution is...
+The drawback is...
+
+For your Redis case:
+The problem is that duplicate webhooks are creating multiple tickets.
+The reason is that we're generating a random grouping ID for every request.
+For example, if the webhook fires four times, we generate four different IDs.
+As a result, four tickets are created.
+One possible solution is to store the request key in Redis with a 15-minute TTL.
+The drawback is that requests received after the TTL could still create duplicate tickets.

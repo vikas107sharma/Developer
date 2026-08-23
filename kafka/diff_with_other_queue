@@ -1,0 +1,259 @@
+
+======================== Pub-Sub vs Kafka ========================
+
+Pub-Sub:
+push-based model
+each subscriber gets their own copy
+message stays until pushed to subscriber, then removed
+Hard to handle when subscriber is slow and producer is fast
+
+Delivery Model
+Aspect          | Pub-Sub         | Kafka
+Delivery        | Push            | Pull
+Retry           | Broker-driven   | Consumer-driven
+Backpressure    | Hard            | Natural
+
+Kafka consumers pull when ready -> built-in backpressure.
+
+Fan-out (Multiple Consumers)
+Pub-Sub:
+Broker duplicates messages
+Memory + network heavy
+Kafka:
+One copy stored
+Many consumers read same data
+Zero duplication
+
+Kafka scales reads cheaply.
+
+Message Lifetime
+Aspect              | Pub-Sub         | Kafka
+Message retention   | Until delivered | Time / size based
+Replay              | No              | Yes
+Late joiner         | Misses data     | Can replay
+
+Consumer Independence
+In Pub-Sub: broker tracks delivery.
+In Kafka: consumers track their own offsets.
+
+Throughput
+Kafka is insanely fast because:
+Sequential disk writes
+OS page cache
+Zero-copy (sendfile)
+Batching
+No per-message ACK to multiple consumers
+
+Pub-Sub systems typically:
+Do per-message routing
+Maintain subscriber lists
+Push data eagerly
+
+Why Kafka Is Not Just Pub-Sub
+Kafka intentionally breaks classic pub-sub assumptions:
+Broker does NOT track per-consumer delivery
+Broker does NOT delete data on consumption
+Consumers are responsible for state
+Storage is first-class
+
+Kafka is closer to:
+A distributed commit log + pub-sub semantics
+
+When to Use Pub-Sub
+Simple notifications
+Low latency push
+No need for replay
+Few consumers
+
+======================== Kafka vs RabbitMQ ========================
+
+Kafka keeps events (event streams).
+RabbitMQ works on tasks (message queue).
+
+Kafka                          | RabbitMQ
+Multiple consumers             | Single consumer per task
+Pull-based (consumer polls)    | Push-based
+Time-based retention           | Removed once task ACKed
+
+Feature         | Kafka       | RabbitMQ
+Model           | Event log   | Message broker
+Push vs Pull    | Pull        | Push
+Replay          | Yes         | No
+Retention       | Time-based  | Until ACK
+Throughput      | Very high   | Moderate
+Scaling         | Horizontal  | Limited
+Consumer State  | Consumer    | Broker
+Best For        | Streaming   | Tasks
+
+
+======================== Work queue vs Pub sub ========================
+
+Work queue: Point to point (each message to one consumer)
+
+resize-image, charge-card, send-email 
+worker1, worker2, worker3
+
+3 worker 3 messages 1:1
+
+Pub-Sub: topic fan-out (each subscriber gets its own copy)
+
+publisher: event (order placed): Topic (order placed)
+inventory email analytics
+1 event 3 copies fan out
+
+======================== Delivery Gurantee ========================
+
+At most once: Fire and forget. Drops are acceptable 
+
+At least once: Retry untill acknowledged. duplicates possible 
+
+Exactly once: Promised by marketing. lock closely
+
+exactly once deliverable across a network is not achievable in general 
+
+neither in Kafka, Rabitmq, SQS.. 
+
+closely related to the problem Two Generals Problem - a classical imposibility result 
+The acknowledgement problem:
+Producer sends the message the broaker sends back the acknowledgement, the acknowledgement lost in the path 
+Producer is confused:
+Option1: retry  may be cause a duplicate 
+option2: Drop the  message: Give up may be lose it 
+
+
+What exactly once means: at least once + idempotency processing 
+
+
+One bad message freezes everything 
+One poison message which is ret rying from infinity. can take down a pipeline handling millions of good messages a minute 
+Effect: Dead letter queue, A DLQ withoud replay path is graveward 
+
+
+Its 3:45 and 
+The broaker is out of memory not because of bug but because producer is producing way faster than consumer 
+
+Producer(10k) messages -> Consumer(2k) diff = 8k which piles up with time 
+
+1. Nothing broke the messages got processed 3 hours later (the answer arrives 3 hrs late is simply no answer)
+2. Backpressure:
+    i: Drop Messages: Cap the queue size (Bounded queues): once the queue reached hard cap, Raises error QUEFULFILLEXCEPTION to producer
+    ii: Auto scale the consumers (20 consumers all hammer to DB bottolnack moves to DB)
+    iii: Credit based flow control, the consumer tells producer how many messages it needs
+
+
+======================== Kafka RabitMQ and SQS ========================
+
+Kafka: log
+RabitMQ: broaker
+SQS: Managed Queue 
+
++
+RabbitMQ - the one with the routing
+INCOMING ROUTING KEY orders.eu.priority
+TOPIC EXCHANGE
+BINDING
+MATCHED
+orders.*.priority
+BINDING
+MATCHED
+orders.eu.*
+BINDING
+orders.#
+MATCHED
+
+Reach the RabitMQ when the routin is the interesting part 
+Background Jobs, Worklows, pre-massage control 
+RabitMQ: consumed message is gone 
+consumedA acknowledged message is gone
+consumeB reaches: sees empty messages queue
+
+In Kafka consumed message = still there 
+Each consumer has its own pointer from where it can start 
+
+Kafka: Replay History 
+RabitMQ: Rich routing 
+SQS: On aws want zero ops  
+
+
+
+RabbitMQ vs Kafka vs SQS — Practical Differences
+The mental model
+
+RabbitMQ = smart postman. It routes messages to the right consumer and forgets them once delivered.
+Kafka = append-only log. It writes everything to disk; consumers read at their own pace and can re-read history.
+SQS = AWS's managed queue. You don't manage anything; AWS handles scale, you just push and pull.
+
+Where each one actually wins
+RabbitMQ wins when: (50k messages/sec)
+
+You need complex routing (this message goes to queue A and B, that one only to C)
+Per-message acknowledgment matters (task queues, job processing)
+You want priority queues, delayed messages, dead-letter queues out of the box
+Low-to-medium throughput (~tens of thousands msg/sec)
+Example: order processing pipeline, email/SMS dispatch, background jobs
+
+Kafka wins when:
+
+High throughput (millions msg/sec)
+Multiple consumers need to read the same stream independently (analytics + audit + ML pipeline all reading order events)
+You need to replay messages (reprocess last 7 days because a bug corrupted data)
+Event sourcing, log aggregation, stream processing
+Example: clickstream tracking, financial transaction logs, CDC from databases
+
+SQS wins when: (120k messages/sec)
+
+You're already on AWS and don't want to babysit infrastructure
+Simple producer→queue→consumer pattern
+Variable/spiky load (auto-scales)
+You don't need ordering (Standard SQS) or you need light ordering (FIFO SQS, capped at 300 msg/sec)
+Example: decoupling Lambda functions, simple work queues, async API processing
+
+Key practical gotchas
+ConcernRabbitMQKafkaSQSMessage replay❌ Once consumed, gone✅ Replay anytime within retention❌ Once deleted, goneOrderingPer-queuePer-partitionOnly in FIFO mode (slow)Max retentionUntil consumedConfigurable (days/forever)14 days maxOps burdenYou run itYou really run it (ZK/KRaft, partitions, rebalancing)Zero — fully managedThroughput ceiling~50K msg/secMillions msg/secUnlimited (Standard), 300/sec (FIFO)Cost modelServer costServer cost (storage-heavy)Pay per requestPush vs PullPush to consumerPull by consumerPull (long-polling)Multi-consumer same msgVia fanout exchangeNative (consumer groups)Need SNS+SQS fanout
+Quick decision shortcuts
+
+"I need a task queue for background jobs" → RabbitMQ or SQS
+"I need to stream events to 5 different systems" → Kafka
+"I'm on AWS and just want it to work" → SQS
+"I need to replay last week's events" → Kafka (others can't)
+"I have complex routing rules" → RabbitMQ
+"My traffic is 1M+ events/sec" → Kafka, no contest
+"I want delayed/scheduled messages easily" → RabbitMQ or SQS (Kafka is awkward for this)
+
+One-liner summary
+RabbitMQ for work distribution, Kafka for event streaming and replay, SQS for managed simplicity on AWS.
+
+
+
+
+================== SQS ========================
+
+Benefits of SQS over kafka
+Zero operational burden. SQS is fully serverless — no brokers, no Zookeeper/KRaft, no partitions to size
+Cost at low volume. SQS is pay-per-request (first 1M requests/month free, then ~$0.40/M). Kafka has a fixed floor — an MSK cluster costs money 24/7 even at zero traffic. 
+Built-in retry + DLQ semantics. Visibility timeout, per-message redelivery, DLQ after N failures are native. In Kafka you build all of this yourself (retry topics, DLQ topics, consumer offset management around poison messages).
+Simpler consumer model. Receive → process → delete. No consumer groups, offsets, rebalancing storms, or partition assignment
+Effortless scaling of consumers. You can add pollers freely; SQS handles distribution. Kafka caps parallelism at partition count
+
+
+No replay. Once a message is deleted, it's gone
+One consumer per message, no fan-out. SQS is a work queue
+Throughput and payload ceilings. 256 KB max message size
+
+
+STANDARD
+Throughput first
+⚫at-least-once
+best-effort ordering
+⚫ effectively unlimited throughput
+
+FIFO
+Order first
+exactly-once processing
+strict ordering
+300 TPS baseline up to ~70k/sec high-throughput mode
+
+Dedup on the enqueue side, 5-minute window. Visibility timeout still applies on consume - your consumer still needs to be idempotent.
+If you don't delete the message before its Visibility timer expiers, SQS hands it back to another consumer.
+
+

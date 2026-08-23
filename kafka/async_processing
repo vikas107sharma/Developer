@@ -1,0 +1,136 @@
+⚡⚡ Asynchronous Processing ⚡⚡
+======================== Background Jobs Using Application Threads ========================
+
+Run async work inside same service process.
+
+API Thread -> submit -> Background Thread
+Pros
+No extra infrastructure
+Low latency
+Cons
+Service crash -> jobs lost
+No retries/durability
+Hard to scale across machines
+
+======================== Database-Based Async (Polling) ========================
+
+Store tasks in DB.
+
+Order Service -> DB(task)
+Worker -> poll DB -> process
+Pros
+Durable
+Easy retries
+Cons
+Constant polling is inefficient
+High DB load
+
+======================== Cron Jobs / Scheduled Workers ========================
+
+Run tasks at fixed intervals.
+
+Cron -> every 5 mins
+
+Use cases:
+daily reports
+reminder emails
+cleanup jobs
+
+Pros
+Predictable
+Simple
+Cons
+Not real-time
+Bad for user-triggered events
+
+Cron is:
+Time-driven, not event-driven
+
+======================== Webhooks ========================
+
+Your system asynchronously calls another system's API.
+
+Example:
+Payment success -> call merchant webhook
+
+Pros
+Real-time integration
+Event-driven
+Cons
+Network failures
+Retry complexity
+Receiver downtime handling
+
+Webhooks are async but unreliable without retries/idempotency.
+
+======================== Serverless / Task Services ========================
+
+Managed async execution.
+
+Examples:
+AWS Lambda
+Google Cloud Tasks
+Microsoft Azure Functions
+
+Pros
+Auto scaling
+No server management
+Cons
+Cold starts
+Execution limits
+Stateless nature
+
+======================== Message Queue ========================
+Producer -> Queue -> Consumer
+
+Used for:
+background jobs
+retries
+buffering traffic spikes
+
+Example:
+Order placed -> send email job
+
+======================== Event Streaming ========================
+
+Events are published and multiple consumers react independently.
+
+Producer -> Topic -> Consumer Groups
+
+Events remain stored and can be replayed later.
+
+======================== Message Queue vs Event Streaming ========================
+Message Queue (Todo List)
+Each message = one job
+One consumer processes it
+Message removed after processing
+
+Example:
+Send email
+Generate invoice
+Resize image
+
+Good for:
+task processing
+worker systems
+
+Event Streaming (Immutable History)
+Event = fact
+Events are immutable
+Multiple consumers can read same event
+Events can be replayed
+
+Example:
+OrderPlaced
+PaymentCompleted
+UserSignedUp
+
+Good for:
+analytics
+auditing
+real-time pipelines
+
+Events stay for retention period even after consumption.
+
+Example:
+Apache Kafka

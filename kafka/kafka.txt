@@ -1,139 +1,26 @@
-⚡⚡ Asynchronous Processing ⚡⚡
-======================== Background Jobs Using Application Threads ========================
+There are eight concepts you need to connect:
 
-Run async work inside same service process.
+Cluster
+Brokers
+Topics
+Partitions
+Replication
+Producers
+Consumers / Consumer Groups
+Controller / KRaft
 
-API Thread -> submit -> Background Thread
-Pros
-No extra infrastructure
-Low latency
-Cons
-Service crash -> jobs lost
-No retries/durability
-Hard to scale across machines
+Then we add:
 
-======================== Database-Based Async (Polling) ========================
-
-Store tasks in DB.
-
-Order Service -> DB(task)
-Worker -> poll DB -> process
-Pros
-Durable
-Easy retries
-Cons
-Constant polling is inefficient
-High DB load
-
-======================== Cron Jobs / Scheduled Workers ========================
-
-Run tasks at fixed intervals.
-
-Cron -> every 5 mins
-
-Use cases:
-daily reports
-reminder emails
-cleanup jobs
-
-Pros
-Predictable
-Simple
-Cons
-Not real-time
-Bad for user-triggered events
-
-Cron is:
-Time-driven, not event-driven
-
-======================== Webhooks ========================
-
-Your system asynchronously calls another system's API.
-
-Example:
-Payment success -> call merchant webhook
-
-Pros
-Real-time integration
-Event-driven
-Cons
-Network failures
-Retry complexity
-Receiver downtime handling
-
-Webhooks are async but unreliable without retries/idempotency.
-
-======================== Serverless / Task Services ========================
-
-Managed async execution.
-
-Examples:
-AWS Lambda
-Google Cloud Tasks
-Microsoft Azure Functions
-
-Pros
-Auto scaling
-No server management
-Cons
-Cold starts
-Execution limits
-Stateless nature
-
-======================== Message Queue ========================
-Producer -> Queue -> Consumer
-
-Used for:
-background jobs
-retries
-buffering traffic spikes
-
-Example:
-Order placed -> send email job
-
-======================== Event Streaming ========================
-
-Events are published and multiple consumers react independently.
-
-Producer -> Topic -> Consumer Groups
-
-Events remain stored and can be replayed later.
-
-======================== Message Queue vs Event Streaming ========================
-Message Queue (Todo List)
-Each message = one job
-One consumer processes it
-Message removed after processing
-
-Example:
-Send email
-Generate invoice
-Resize image
-
-Good for:
-task processing
-worker systems
-
-Event Streaming (Immutable History)
-Event = fact
-Events are immutable
-Multiple consumers can read same event
-Events can be replayed
-
-Example:
-OrderPlaced
-PaymentCompleted
-UserSignedUp
-
-Good for:
-analytics
-auditing
-real-time pipelines
-
-Events stay for retention period even after consumption.
-
-Example:
-Apache Kafka
+Offsets
+Log/storage
+Leader/follower replication
+ISR
+Acknowledgements
+Failure handling
+Rebalancing
+Exactly-once / idempotence
+Performance/scaling
+End-to-end message journey
 
 ======================== Is Kafka a Message Queue or Event Stream? ========================
 
@@ -142,6 +29,8 @@ Event Streaming Platform
 
 But it can also behave like a message queue depending on consumption pattern.
 
+Each consumer can read from different pointer.
+It can possible that payment serves has proccessed all message while email service is 10 messages behind.
 
 ✅✅ Kafka ✅✅
 
@@ -153,6 +42,26 @@ a machine
 running Kafka
 storing partitions on disk
 
+======================== Kafka cluster ========================
+
+A Kafka cluster is a group of Kafka brokers working together as one Kafka system.
+For example:
+
+Kafka Cluster
+│
+├── Broker 1
+├── Broker 2
+└── Broker 3
+
+Example:
+Topic: orders
+Partitions: 6
+
+Broker 1 → P0, P3
+Broker 2 → P1, P4
+Broker 3 → P2, P5
+
+A Kafka cluster is a collection of Kafka brokers operating together.
 Kafka Cluster
 Broker 1
 Broker 2
@@ -164,6 +73,9 @@ Kafka scales by adding brokers.
 To avoid single points of failure we have replicas of brokers, and partitions are also replicated internally (replication_factor).
 
 ======================== Topics ========================
+
+A topic is a logical stream/category of messages.
+But a topic itself isn't where Kafka physically stores everything.
 
 Where are events stored?
 Inside brokers, in partitions.
@@ -179,7 +91,12 @@ Topic: folder name
 Partitions: actual files inside it
 You cannot write data into the folder — you write data into the files.
 
+Example: 
+Topic: orders
+
 ======================== Partitions ========================
+
+A partition is an ordered append-only log.
 
 Perform hashing, then assign the event to a specific partition.
 Ordering is maintained within a partition, but not across partitions.
@@ -187,20 +104,34 @@ Ordering is maintained within a partition, but not across partitions.
 A topic is not physical storage — it is a logical grouping.
 Kafka needs physical storage, and that is what partitions are.
 
-Why a single log (topic without partitions) doesn't work
-Imagine Kafka had:
-Topic: orders
-(single log file)
+Suppose:
+orders-P0
 
-Problems:
-X No scalability
-Only one broker can write
-Throughput capped by one disk and one CPU
-X No parallelism
-Only one consumer can read efficiently
-Cannot scale consumers
-X No fault tolerance
-If broker dies, topic gone
+contains:
+Offset     Message
+------     -------
+0          Order A
+1          Order B
+2          Order C
+3          Order D
+4          Order E 
+
+Why partitions exist
+Because one partition has limited throughput.
+
+Instead of:
+Topic
+  ↓
+One server
+
+you can have:
+             orders
+          /     |     \
+        P0     P1     P2
+        ↓      ↓      ↓
+     Broker1 Broker2 Broker3
+
+Now producers and consumers can work in parallel.
 
 Kafka's goal was:
 Massive throughput + horizontal scaling
@@ -219,9 +150,56 @@ If a topic has 5 partitions:
 up to 5 consumers can read in parallel (per consumer group)
 Without partitions, only one consumer would be useful.
 
-3. Fault tolerance
-Partitions can be replicated across brokers.
-Topic-level replication is meaningless — replication only makes sense at the partition level.
+
+======================== Partition key ========================
+
+Message distribution among partitions
+For the default Kafka producer partitioner, Kafka uses a murmur2 hash for keyed messages.
+
+Conceptually:
+
+key = "order_123"
+hash = murmur2(key)
+partition = toPositive(hash) % numberOfPartitions
+hash % partition_count is the conceptual default behavior for keyed partitioning, with Kafka's default partitioner using Murmur2.
+
+So with 3 partitions:
+murmur2("order_123")
+        ↓
+some integer
+        ↓
+positive integer % 3
+        ↓
+0 / 1 / 2
+
+The actual code is in the Kafka client library's producer partitioner implementation
+
+What happens if you increase partitions?
+Suppose:
+3 partitions
+hash(order_123) = 100
+100 % 3 = 1
+order_123 → P1
+
+Now you increase the topic to 4 partitions:
+100 % 4 = 0
+order_123 → P0
+Same key, different partition.
+
+Before:
+P1:
+  CREATED
+  PAID
+  SHIPPED
+
+Increase partitions
+After:
+P0:
+  DELIVERED
+
+Kafka partitions can be scaled horizontally by increasing the partition count, but increasing partitions can change key-to-partition mapping and therefore affect ordering guarantees for keyed messages.
+3 partitions → 6 partitions
+        ✅ possible
 
 ======================== Consumer Groups & Partition Assignment ========================
 
@@ -247,25 +225,198 @@ c2 -> p2, p3
 
 Inside Kafka, a consumer cannot exist without a consumer group.
 
-======================== Leader-Follower Replication ========================
+Consumer lag:
+Producers are producing at much higher rate than consumers. 
 
-Replication factor = 2
-Partition 0:
-Leader -> Broker 1
-Follower -> Broker 2
-Partition 1:
-Leader -> Broker 2
-Follower -> Broker 3
-Partition 2:
-Leader -> Broker 3
-Follower -> Broker 1
+======================== Producer chooses the partition ========================
 
-Only the leader handles reads/writes.
-Followers:
-replicate data
-take over if leader fails
+Decision 1 — Which partition?
+
+Producer/partitioner:
+
+order_id
+   ↓
+partitioner
+   ↓
+P2
+
+
+Decision 2 — Which broker stores P2?
+
+Cluster/controller:
+
+P2
+ ↓
+Leader → Broker 3
+Replica → Broker 1
+Replica → Broker 2
+
+So:
+
+Producer
+   │
+   │ chooses partition
+   ↓
+  P2
+   │
+   │ controller determines replica placement
+   ↓
+Broker 3 = Leader
+Broker 1 = Replica
+Broker 2 = Replica
+
+This distinction is frequently tested in interviews.
+
+======================== Replication ========================
+
+Partition = logical unit of data
+Broker = machine/server that stores partitions
+
+For every partition, one replica is the leader. The others are followers.
+Producers normally send writes to the leader.
+
+Example: 3 partitions, 2 brokers
+You can have:
+              Broker 1        Broker 2
+              --------        --------
+P0             Leader
+P1                             Leader
+P2             Leader
+
+Replication factor = 3
+              Broker 1    Broker 2    Broker 3
+             --------     --------     --------
+P0             Leader      Replica      Replica
+P1             Replica     Leader       Replica
+P2             Replica     Replica      Leader
+
+KRaft controller: 
+The Kafka controller assigns partition replicas to brokers and manages partition leadership.
+
+Each partition has three copies.
+
+If Broker 1 dies:
+P0
+ ↓
+Broker 1 ❌
+
+Kafka can promote one of the replicas:
+
+P0
+Broker 1 ❌
+
+Broker 2 → new Leader
+Broker 3 → Replica
+
+======================== Leader-Follower ========================
+
+For every partition, one replica is the leader.
+The others are followers. 
+
+Producers normally send writes to the leader.
+Consumers fetch from the leader by default in the common setup.
+
+The followers replicate the leader's log.
+
+Why only one leader?
+Suppose two brokers could independently accept writes:
+
+Broker 1:
+P0:
+0 A
+1 B
+
+Broker 2:
+P0:
+0 A
+1 X
+Now you have conflicting histories.
+
+======================== ISR — In-Sync Replicas ========================
+
+ISR = {Broker 1, Broker 2, Broker 3}
+Broker 3 becomes slow:
+
+Broker 1 → Leader       ✅
+Broker 2 → Replica      ✅
+Broker 3 → Replica      ❌ slow
+
+Kafka can remove Broker 3 from ISR:
+
+ISR = {Broker 1, Broker 2}
+
+If the leader dies, Kafka can select an eligible in-sync replica as the new leader.
+
+======================== acks ========================
+
+Producer sends:
+OrderCreated
+to the leader.
+
+How much confirmation does the producer require?
+That's controlled by acks.
+
+acks=0
+Producer doesn't wait for acknowledgement.
+Producer
+   │
+   └──► Broker
+        "hopefully received"
+
+Fastest, weakest durability guarantee.
+
+acks=1
+Leader acknowledges after writing locally.
+Producer
+   ↓
+Leader
+   ↓
+write
+   ↓
+ACK
+
+Followers might not have replicated yet.
+
+acks=all
+Leader waits until the required ISR replicas have acknowledged according to Kafka's replication settings.
+
+Conceptually:
+Producer
+   ↓
+Leader
+   ├──► Replica 1
+   └──► Replica 2
+         ↓
+        ACK
+
+This provides stronger durability.
 
 ======================== Offset Commits ========================
+
+Every record in a partition gets an offset.
+
+P0
+Offset
+  0 → A
+  1 → B
+  2 → C
+  3 → D
+
+The consumer might have processed through:
+offset 2
+
+The next message is:
+offset 3
+
+The offset is partition-specific.
+There is no global Kafka offset.
+
+Correct:
+P0 → offset 100
+P1 → offset 57
+P2 → offset 891
+
+Offsets are maintained per consumer group and partition.
 
 1. Auto Commit
 Kafka commits periodically.
@@ -282,27 +433,6 @@ Asynchronous
 Best practice:
 process message
 commit offset
-
-======================== Delivery Guarantees ========================
-
-Guarantee         | How
-At-most-once      | Commit before processing
-At-least-once     | Commit after processing (Kafka default)
-Exactly-once      | Kafka transactions + idempotent producers
-
-======================== How Do Consumers Know an Event Has Arrived? ========================
-
-X Kafka does NOT push events
-Consumers poll.
-Kafka follows pull-based consumption.
-
-Key point: the consumer doesn't get notified.
-Instead:
-Consumer polls periodically
-If no data -> broker waits (long poll)
-If data arrives -> broker responds immediately
-
-This is called long polling.
 
 ======================== Offsets ========================
 
@@ -343,6 +473,41 @@ Committed Offset: 125
 Think of it as a map:
 (payment-service, orders, P0) -> 125
 (payment-service, orders, P1) -> 88
+
+======================== Delivery Guarantees ========================
+
+Guarantee         | How
+At-most-once      | Commit before processing
+At-least-once     | Commit after processing (Kafka default)
+Exactly-once      | Kafka transactions + idempotent producers
+
+======================== How Do Consumers Know an Event Has Arrived? ========================
+
+X Kafka does NOT push events
+Consumers poll.
+Kafka follows pull-based consumption.
+
+Key point: the consumer doesn't get notified.
+Instead:
+Consumer polls periodically
+If no data -> broker waits (long poll)
+If data arrives -> broker responds immediately
+
+This is called long polling.
+
+======================== Consumer Rebalancing ========================
+
+P0 → C1
+P1 → C2
+P2 → C3
+
+Then C2 crashes.
+Kafka needs to redistribute partitions.
+
+Potentially:
+P0 → C1
+P1 → C3
+P2 → C3
 
 ======================== Why Kafka Is So Fast at Writes ========================
 
@@ -387,241 +552,755 @@ Consumers read independently
 1000 consumers reading the same data?
 Disk read once, memory read many times.
 
-======================== Pub-Sub vs Kafka ========================
 
-Pub-Sub:
-push-based model
-each subscriber gets their own copy
-message stays until pushed to subscriber, then removed
-Hard to handle when subscriber is slow and producer is fast
+======================== Controller ========================
 
-Delivery Model
-Aspect          | Pub-Sub         | Kafka
-Delivery        | Push            | Pull
-Retry           | Broker-driven   | Consumer-driven
-Backpressure    | Hard            | Natural
+Kafka needs someone to coordinate things like:
 
-Kafka consumers pull when ready -> built-in backpressure.
+partition leadership
+replica assignments
+broker failures
+leader elections
+metadata
 
-Fan-out (Multiple Consumers)
-Pub-Sub:
-Broker duplicates messages
-Memory + network heavy
+This is the Kafka controller.
+
+Modern Kafka uses KRaft for cluster metadata management.
+Older Kafka versions used ZooKeeper.
+
+Kafka Cluster
+
+Controller Quorum
+      │
+      ├── Controller
+      ├── Controller
+      └── Controller
+             │
+             ↓
+          Brokers
+
+======================== KRaft ========================
+
+"What is KRaft in Kafka?"
+KRaft is Kafka's built-in consensus mechanism for managing cluster metadata. Kafka maintains a controller quorum using the Raft protocol, with one active controller and replicated metadata logs. The controller manages things like broker membership and partition leadership, and when a controller fails, another controller can be elected from the quorum.
+
+"What is the metadata log?"
+It's an ordered, replicated log containing Kafka cluster metadata changes, allowing controllers to maintain a consistent view of the cluster state.
+
+Kafka uses the Raft consensus protocol for its metadata quorum.
+
+Instead of:
+
+Kafka
+  ↓
+ZooKeeper
+
+modern Kafka can use:
+
+Kafka
+  ↓
+KRaft controller quorum
+
+The controllers maintain the cluster metadata.
+
+For example:
+
+Topic orders
+Partitions = 3
+
+P0 leader = Broker 1
+P1 leader = Broker 2
+P2 leader = Broker 3
+
+That metadata needs to be coordinated consistently.
+
+KRaft controllers handle this.
+
+What exactly is stored by KRaft?
+
+KRaft maintains a:
+metadata log
+
+Think of it as:
+Metadata Log
+
+offset 0 → create topic orders
+offset 1 → create partition P0
+offset 2 → P0 leader = Broker 1
+offset 3 → P1 leader = Broker 2
+offset 4 → Broker 2 removed
+offset 5 → P1 leader = Broker 3
+...
+
+
+The metadata log contains information about the Kafka cluster.
+
+For example:
+
+Topic exists
+Partition exists
+Partition replicas
+Partition leader
+Broker registration
+Configuration changes
+ISR-related metadata/state changes
+
+======================== Why do we need controllers? ========================
+
+Imagine:
+Topic: orders
+
+P0 → Broker 1
+P1 → Broker 2
+P2 → Broker 3
+
+Now Broker 2 crashes.
+
+Kafka needs to answer:
+
+Who is the new leader of P1?
+
+After Broker 2 dies:
+P1:
+    Broker 3 → New Leader
+
+But who makes this decision?
+The controller.
+
+
+Controller quorum
+Now suppose you have:
+
+Controller 1
+Controller 2
+Controller 3
+
+One controller becomes the:
+ACTIVE CONTROLLER
+
+The others are followers.
+
+Conceptually:
+
+              Controller 1
+              ┌───────────┐
+              │  LEADER   │
+              └─────┬─────┘
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+ Controller 2            Controller 3
+  follower                 follower
+
+This is a Raft quorum.
+
+
+                    KRaft Controller Quorum
+                 ┌───────────────────────────┐
+                 │                           │
+                 │ C1       C2       C3      │
+                 │ │        │        │       │
+                 │ └────────┼────────┘       │
+                 │          │                │
+                 │     Metadata Log           │
+                 │          │                │
+                 └──────────┼────────────────┘
+                            │
+                     Cluster Metadata
+                            │
+             ┌──────────────┼──────────────┐
+             │              │              │
+             ▼              ▼              ▼
+          Broker 1       Broker 2       Broker 3
+             │              │              │
+          P0 Leader       P1 Leader      P2 Leader
+             │              │              │
+          replicas       replicas       replicas
+
+Leader controller
+
+Now suppose:
+
+C1 = leader
+C2 = follower
+C3 = follower
+
+C1 receives a metadata-changing event:
+
+Broker 2 crashed
+
+The controller determines:
+
+P1 leader must change
+
+It records the metadata change into the metadata log.
+
+Conceptually:
+
+Broker failure
+      │
+      ▼
+Controller leader
+      │
+      ▼
+Metadata log
+      │
+      ▼
+Replicated to controller quorum
+      │
+      ▼
+New cluster state
+
+Now the cluster knows:
+
+P1 → Broker 3 is leader
+
+======================== How does the controller know Broker 2 died? ========================
+
+The broker maintains communication with the controller.
+
+Conceptually:
+
+Broker 1 ───── heartbeat ─────► Controller
+Broker 2 ───── heartbeat ─────► Controller
+Broker 3 ───── heartbeat ─────► Controller
+
+If Broker 2 stops communicating:
+
+Broker 2 ❌
+
+the controller determines that the broker is unavailable.
+
+Then it can perform metadata/leadership changes.
+
+Don't describe this in an interview as:
+
+"The broker tells Kafka that it died."
+
+Obviously it can't reliably do that if it crashed.
+
+The controller detects broker liveness through the cluster's broker/controller communication mechanism.
+
+======================== Broker vs Controller ========================
+
+This distinction is important.
+
+A broker handles data-plane work:
+
+produce
+consume
+store
+replicate
+
+Producer ──(Publishes)──► [   BROKER   ] ──(Fetches)──► Consumer 1 ──► Application
+                          [  Topic P2  ]                      
+                          [ Log: 100.. ]
+                          [ Offset:102 ]
+
+Role of the Broker:
+
+Storage & Persistence: Stores records 100, 101, and 102 sequentially on disk inside partition P2.
+
+Offset Tracking: Receives and saves the consumer group's committed offset (102).
+
+Fetch Handling: Serves records to Consumer 1 when requested and updates what has been delivered.
+
+Failover Coordination: When Consumer 1 crashes, the broker detects the failure (via missed heartbeats), rebalances the group, and tells the new consumer to resume fetching starting at offset 103 (the next uncommitted offset).
+
+
+
+Broker's Role in Delivery Semantics
+
+The delivery semantic (At-Least-Once, At-Most-Once, or Exactly-Once) depends directly on when the consumer tells the broker to update the committed offset relative to processing:
+
+At-Least-Once (Most Common): The consumer reads records 100–102, completes application processing, and then sends the commit for 102 to the broker. If it crashes after processing but before committing, the broker still holds offset 99. The new consumer fetches 100–102 again, causing duplicate processing.
+
+At-Most-Once: The consumer fetches 100–102, immediately commits offset 102 to the broker, and then processes them. If it crashes mid-processing, the broker already saved 102, so the new consumer resumes at 103, missing the unprocessed records.
+
+Exactly-Once: The broker works with producers and consumers via transactional APIs to write records and commit offsets together atomically.
+
+The controller handles cluster coordination:
+
+leader assignment
+broker membership
+metadata
+partition state
+
+Modern Kafka deployments can use separate controller roles or combined broker/controller roles depending on configuration.
+
+======================== Metadata ========================
+
+The producer needs to know:
+
+Where is topic orders?
+Where is P2?
+Who is the leader for P2?
+
+The producer obtains Kafka metadata.
+
+For example:
+
+orders-P0 → Broker 1
+orders-P1 → Broker 3
+orders-P2 → Broker 2
+
+Then the producer can directly send records to the correct broker.
+
+Conceptually:
+
+Producer
+   │
+   │ metadata request
+   ▼
+Kafka cluster
+   │
+   │ P2 leader = Broker 2
+   ▼
+Producer
+   │
+   │ record
+   ▼
+Broker 2
+
+
+======================== Complete Producer Flow ========================
+
+Application:
+
+producer.send({
+  topic: "orders",
+  key: "ORD-123",
+  value: {
+    status: "PAID"
+  }
+});
+
+Architecture:
+
+Application
+     │
+     ▼
+Kafka Producer
+     │
+     │ key = ORD-123
+     ▼
+Partitioner
+     │
+     │ hash(key)
+     ▼
+Partition P2
+     │
+     │ metadata says leader
+     ▼
+Broker 2
+     │
+     │ P2 Leader
+     ├─────────────► Broker 1
+     │                 P2 Replica
+     │
+     └─────────────► Broker 3
+                       P2 Replica
+
+
+======================== Complete Consumer Flow ========================
+
+Now:
+
+P2
+ ↓
+Consumer Group
+ ↓
+Consumer 1
+ ↓
+application processing
+
+The consumer fetches records:
+
+P2:
+
+100 → ORD-123 CREATED
+101 → ORD-123 PAID
+102 → ORD-123 SHIPPED
+
+Consumer processes them in order.
+
+Then commits its offset.
+
+processed:
+100
+101
+102
+
+committed offset:
+102
+
+If it crashes:
+
+Consumer dies after processing 102
+
+another consumer can resume based on the committed offset.
+
+This is where delivery semantics become important.
+
+
+======================== Why Kafka is not simply a queue ========================
+
+Traditional queue:
+
+Producer
+   ↓
+Queue
+   ↓
+Consumer
+   ↓
+message removed
+
 Kafka:
-One copy stored
-Many consumers read same data
-Zero duplication
 
-Kafka scales reads cheaply.
+Producer
+   ↓
+Partition log
+   ↓
+Consumer Group A
+   ↓
+offset
 
-Message Lifetime
-Aspect              | Pub-Sub         | Kafka
-Message retention   | Until delivered | Time / size based
-Replay              | No              | Yes
-Late joiner         | Misses data     | Can replay
+Same log
+   ↓
+Consumer Group B
+   ↓
+different offset
 
-Consumer Independence
-In Pub-Sub: broker tracks delivery.
-In Kafka: consumers track their own offsets.
-
-Throughput
-Kafka is insanely fast because:
-Sequential disk writes
-OS page cache
-Zero-copy (sendfile)
-Batching
-No per-message ACK to multiple consumers
-
-Pub-Sub systems typically:
-Do per-message routing
-Maintain subscriber lists
-Push data eagerly
-
-Why Kafka Is Not Just Pub-Sub
-Kafka intentionally breaks classic pub-sub assumptions:
-Broker does NOT track per-consumer delivery
-Broker does NOT delete data on consumption
-Consumers are responsible for state
-Storage is first-class
-
-Kafka is closer to:
-A distributed commit log + pub-sub semantics
-
-When to Use Pub-Sub
-Simple notifications
-Low latency push
-No need for replay
-Few consumers
-
-======================== Kafka vs RabbitMQ ========================
-
-Kafka keeps events (event streams).
-RabbitMQ works on tasks (message queue).
-
-Kafka                          | RabbitMQ
-Multiple consumers             | Single consumer per task
-Pull-based (consumer polls)    | Push-based
-Time-based retention           | Removed once task ACKed
-
-Feature         | Kafka       | RabbitMQ
-Model           | Event log   | Message broker
-Push vs Pull    | Pull        | Push
-Replay          | Yes         | No
-Retention       | Time-based  | Until ACK
-Throughput      | Very high   | Moderate
-Scaling         | Horizontal  | Limited
-Consumer State  | Consumer    | Broker
-Best For        | Streaming   | Tasks
+The same event can be consumed independently by many systems.
 
 
-======================== Work queue vs Pub sub ========================
+======================== Retention ========================
 
-Work queue: Point to point (each message to one consumer)
+Kafka doesn't necessarily delete a record after consumption.
 
-resize-image, charge-card, send-email 
-worker1, worker2, worker3
+It retains data based on policies such as:
 
-3 worker 3 messages 1:1
+retention.ms
+retention.bytes
 
-Pub-Sub: topic fan-out (each subscriber gets its own copy)
+So:
 
-publisher: event (order placed): Topic (order placed)
-inventory email analytics
-1 event 3 copies fan out
+Day 1:
+events exist
 
-======================== Delivery Gurantee ========================
+Day 2:
+events exist
 
-At most once: Fire and forget. Drops are acceptable 
+Day N:
+retention policy deletes old segments
 
-At least once: Retry untill acknowledged. duplicates possible 
+This lets consumers replay historical events while they remain retained.
 
-Exactly once: Promised by marketing. lock closely
+======================== Log segments ========================
 
-exactly once deliverable across a network is not achievable in general 
+Kafka doesn't keep an entire partition as one giant file.
 
-neither in Kafka, Rabitmq, SQS.. 
+Partitions are divided into log segments.
 
-closely related to theproblem Two Generals Problem - a classical imposibility result 
-The acknowledgement problem:
-Producer sends the message the broaker sends back the acknowledgement, the acknowledgement lost in the path 
-Producer is confused:
-Option1: retry  may be cause a duplicate 
-option2: Drop the  message: Give up may be lose it 
+Conceptually:
 
+P0
 
-What exactly once means: at least once + idempotency processing 
+segment-0001
+  offsets 0-999
 
+segment-0002
+  offsets 1000-1999
 
-One bad message freezes everything 
-One poison message which is retrying from infinity. can take down a pipeline handling millions of good messages a minute 
-Effect: Dead letter queue, A DLQ withoud replay path is graveward 
+segment-0003
+  offsets 2000-2999
 
+Kafka can roll/delete old segments efficiently.
 
-Its 3:45 and 
-The broaker is out of memory not because of bug but because producer is producing way faster than consumer 
-
-Producer(10k) messages -> Consumer(2k) diff = 8k which piles up with time 
-
-1. Nothing broke the messages got processed 3 hours later (the answer arrives 3 hrs late is simply no answer)
-2. Backpressure:
-    i: Cap the queue size (Bounded queues): once the queue reached hard cap, Raises error QUEFULFILLEXCEPTION to producer
-    ii: Auto scale the consumers 
-    iii: Credit based flow control, the consumer tells producer how many messages it needs
+This is one reason Kafka can handle large volumes of data.
 
 
-======================== Kafka RabitMQ and SQS ========================
+======================== Kafka's architecture in one picture ========================
 
-Kafka: log
-RabitMQ: broaker
-SQS: Managed Queue 
+                         ┌───────────────────────┐
+                         │    KRaft Controllers  │
+                         │   Cluster Metadata    │
+                         └───────────┬───────────┘
+                                     │
+                         cluster coordination
+                                     │
+          ┌──────────────────────────┼─────────────────────────┐
+          │                          │                         │
+          ▼                          ▼                         ▼
+     ┌─────────┐               ┌─────────┐               ┌─────────┐
+     │ Broker 1│               │ Broker 2│               │ Broker 3│
+     └────┬────┘               └────┬────┘               └────┬────┘
+          │                         │                         │
+          │                         │                         │
+          └─────────────────────────┼─────────────────────────┘
+                                    │
+                                  Topics
+                                    │
+                         ┌──────────┴──────────┐
+                         │                     │
+                       orders              payments
+                         │
+                  ┌──────┼──────┐
+                  │      │      │
+                 P0     P1     P2
+                  │      │      │
+             replication/leader
+                  │      │      │
+                  ▼      ▼      ▼
 
-+
-RabbitMQ - the one with the routing
-INCOMING ROUTING KEY orders.eu.priority
-TOPIC EXCHANGE
-BINDING
-MATCHED
-orders.*.priority
-BINDING
-MATCHED
-orders.eu.*
-BINDING
-orders.#
-MATCHED
-
-Reach the RabitMQ when the routin is the interesting part 
-Background Jobs, Worklows, pre-massage control 
-RabitMQ: consumed message is gone 
-consumedA acknowledged message is gone
-consumeB reaches: sees empty messages queue
-
-In Kafka consumed message = still there 
-Each consumer has its own pointer from where it can start 
-
-Kafka: Replay History 
-RabitMQ: Rich routing 
-SQS: On aws want zero ops  
-
-
-
-RabbitMQ vs Kafka vs SQS — Practical Differences
-The mental model
-
-RabbitMQ = smart postman. It routes messages to the right consumer and forgets them once delivered.
-Kafka = append-only log. It writes everything to disk; consumers read at their own pace and can re-read history.
-SQS = AWS's managed queue. You don't manage anything; AWS handles scale, you just push and pull.
-
-Where each one actually wins
-RabbitMQ wins when:
-
-You need complex routing (this message goes to queue A and B, that one only to C)
-Per-message acknowledgment matters (task queues, job processing)
-You want priority queues, delayed messages, dead-letter queues out of the box
-Low-to-medium throughput (~tens of thousands msg/sec)
-Example: order processing pipeline, email/SMS dispatch, background jobs
-
-Kafka wins when:
-
-High throughput (millions msg/sec)
-Multiple consumers need to read the same stream independently (analytics + audit + ML pipeline all reading order events)
-You need to replay messages (reprocess last 7 days because a bug corrupted data)
-Event sourcing, log aggregation, stream processing
-Example: clickstream tracking, financial transaction logs, CDC from databases
-
-SQS wins when:
-
-You're already on AWS and don't want to babysit infrastructure
-Simple producer→queue→consumer pattern
-Variable/spiky load (auto-scales)
-You don't need ordering (Standard SQS) or you need light ordering (FIFO SQS, capped at 300 msg/sec)
-Example: decoupling Lambda functions, simple work queues, async API processing
-
-Key practical gotchas
-ConcernRabbitMQKafkaSQSMessage replay❌ Once consumed, gone✅ Replay anytime within retention❌ Once deleted, goneOrderingPer-queuePer-partitionOnly in FIFO mode (slow)Max retentionUntil consumedConfigurable (days/forever)14 days maxOps burdenYou run itYou really run it (ZK/KRaft, partitions, rebalancing)Zero — fully managedThroughput ceiling~50K msg/secMillions msg/secUnlimited (Standard), 300/sec (FIFO)Cost modelServer costServer cost (storage-heavy)Pay per requestPush vs PullPush to consumerPull by consumerPull (long-polling)Multi-consumer same msgVia fanout exchangeNative (consumer groups)Need SNS+SQS fanout
-Quick decision shortcuts
-
-"I need a task queue for background jobs" → RabbitMQ or SQS
-"I need to stream events to 5 different systems" → Kafka
-"I'm on AWS and just want it to work" → SQS
-"I need to replay last week's events" → Kafka (others can't)
-"I have complex routing rules" → RabbitMQ
-"My traffic is 1M+ events/sec" → Kafka, no contest
-"I want delayed/scheduled messages easily" → RabbitMQ or SQS (Kafka is awkward for this)
-
-One-liner summary
-RabbitMQ for work distribution, Kafka for event streaming and replay, SQS for managed simplicity on AWS.
+             ┌──────────────────────┐
+             │    Consumer Group    │
+             │                      │
+             │ C1       C2       C3 │
+             └──────────────────────┘
 
 
-================== SQS ========================
+======================== The architecture you should memorize ========================
 
-Benefits of SQS over kafka
-Zero operational burden. SQS is fully serverless — no brokers, no Zookeeper/KRaft, no partitions to size
-Cost at low volume. SQS is pay-per-request (first 1M requests/month free, then ~$0.40/M). Kafka has a fixed floor — an MSK cluster costs money 24/7 even at zero traffic. 
-Built-in retry + DLQ semantics. Visibility timeout, per-message redelivery, DLQ after N failures are native. In Kafka you build all of this yourself (retry topics, DLQ topics, consumer offset management around poison messages).
-Simpler consumer model. Receive → process → delete. No consumer groups, offsets, rebalancing storms, or partition assignment
-Effortless scaling of consumers. You can add pollers freely; SQS handles distribution. Kafka caps parallelism at partition count
+Don't memorize 50 disconnected Kafka facts.
+Memorize this:
+
+                         KAFKA CLUSTER
+                              │
+                   ┌──────────┴──────────┐
+                   │                     │
+              KRaft Controllers       Brokers
+              (control plane)       (data plane)
+                                         │
+                                      Topics
+                                         │
+                                    Partitions
+                                         │
+                              ┌──────────┴──────────┐
+                              │                     │
+                           Leader               Followers
+                              │                     │
+                              └──── replication ────┘
+                                         │
+                                      Storage
+                                         │
+                                      Offsets
+                                         │
+                                  Consumer Groups
+                                         │
+                                     Consumers
+
+And the message journey:
+
+APPLICATION
+    │
+    ▼
+PRODUCER
+    │
+    │ key
+    ▼
+PARTITIONER
+    │
+    ▼
+PARTITION
+    │
+    ▼
+LEADER BROKER
+    │
+    ├────────► FOLLOWER
+    ├────────► FOLLOWER
+    │
+    ▼
+ACK
+    │
+    ▼
+CONSUMER GROUP
+    │
+    ▼
+CONSUMER
+    │
+    ▼
+PROCESS
+    │
+    ▼
+COMMIT OFFSET
+
+======================== The most important distinction: Control Plane vs Data Plane ========================
+
+This is a useful architecture-level mental model.
+
+Control plane
+KRaft Controllers
+      ↓
+cluster metadata
+      ↓
+partition assignments
+      ↓
+leader elections
+      ↓
+broker membership
+Data plane
+Producer
+    ↓
+Broker
+    ↓
+Partition
+    ↓
+Replication
+    ↓
+Consumer
+
+This distinction will make Kafka architecture questions much easier.
 
 
-No replay. Once a message is deleted, it's gone
-One consumer per message, no fan-out. SQS is a work queue
-Throughput and payload ceilings. 256 KB max message size
+======================== What happens when a broker dies? ========================
+
+Suppose:
+P0
+Broker 1 → Leader
+Broker 2 → Replica
+Broker 3 → Replica
+
+Broker 1 crashes.
+Controller detects the broker failure.
+Broker 1 ❌
+
+Controller determines:
+P0 needs a new leader
+
+It selects an eligible replica:
+Broker 2 → New Leader
+Broker 3 → Replica
+
+Metadata is updated.
+Producers/consumers refresh metadata and start communicating with Broker 2.
+
+The important point:
+The controller doesn't move every message manually. It coordinates leadership and replica state; brokers handle the actual data replication.
+
+======================== What happens when a consumer dies? ========================
+
+Different problem.
+
+P0 → C1
+P1 → C2
+P2 → C3
+
+C2 ❌
+
+Consumer group coordination detects the failure.
+A rebalance occurs:
+P0 → C1
+P1 → C3
+P2 → C3
+
+The new consumer continues from the group's committed offsets.
+
+So remember:
+
+Broker failure
+→ Controller / partition leader election
+
+Consumer failure
+→ Consumer group rebalance
+
+
+======================== What happens when a producer sends a message? ========================
+
+This is the full interview-quality answer:
+
+1. Application creates record
+        ↓
+2. Producer assigns key
+        ↓
+3. Partitioner selects partition
+        ↓
+4. Producer uses metadata to find partition leader
+        ↓
+5. Record sent to leader broker
+        ↓
+6. Leader appends record to partition log
+        ↓
+7. Followers replicate the record
+        ↓
+8. Required acknowledgements received
+        ↓
+9. Producer receives ACK
+
+======================== What happens when a consumer reads? ========================
+
+1. Consumer joins consumer group
+        ↓
+2. Group coordinator assigns partitions
+        ↓
+3. Consumer fetches records from partition leader
+        ↓
+4. Application processes records
+        ↓
+5. Consumer commits offset
+
+======================== Scaling Kafka ========================
+
+Scale brokers
+3 brokers → 6 brokers
+
+Gives you more cluster resources.
+
+Scale partitions
+orders:
+3 partitions → 12 partitions
+
+Gives more partition-level parallelism.
+
+Scale consumers
+3 consumers → 12 consumers
+
+Only useful up to the available partition parallelism.
+
+======================== What Kafka actually need ========================
+
+Partitions you must size
+Consumer groups + rebalancing 
+Offset + commit sementics 
+Lag monitoring nobigy builds
+Retention policy + storage bill 
+Broakers to run and upgrage  
+
+
+Act as an expert technical writer and Apache Kafka specialist. 
+
+I have a set of complete raw notes on Apache Kafka, but the structure is messy and topics are scattered (for example, a term might be defined on line 100, but its deeper explanation or configuration appears on line 400). 
+
+Please reorganize, consolidate, and visually format my raw notes using the following strict constraints:
+
+---
+
+### 1. Structure & Organization
+* **Consolidate Topics:** Group all related concepts, definitions, configurations, and deep-dives into single, unified sections (e.g., all information about Partitions, Producers, Consumers, Broker Architecture, ZooKeeper/KRaft, Topics, Offsets, and Retention should each live in their own dedicated, single section).
+* **Logical Hierarchy:** Order the consolidated sections logically, starting from high-level architecture/concepts to core components, configurations, and advanced features.
+* **Minimal Loss Strategy:** Merge duplicate points and remove redundant phrasing, but **preserve all core facts, technical specifics, code snippets, and configuration keys**. Minimize content removal.
+
+---
+
+### 2. Formatting & Visual Style
+* **ASCII Layouts & Tables:** Use monospaced ASCII tables and boxed borders (using characters like `+`, `-`, `|`, `=`, `+---`, etc.) for comparisons, architecture summaries, and key configuration parameters. Ensure columns align cleanly for monospaced fonts (e.g., Consolas, Courier New, Cascadia Code).
+* **Emojis:** Use clean, professional visual anchors/emojis to flag specific entry types:
+  * 📌 Definitions & Key Concepts
+  * ⚙️ Configurations & Parameters
+  * 💡 Important Tips & Best Practices
+  * ⚠️ Warnings & Common Pitfalls
+  * 🔄 Architectural Flow / Processing Steps
+* **Section Separators:** Use distinct ASCII divider lines to separate major subtopics clean and visibly, such as:
+  +===================================================================+
+  |                          SECTION TITLE                            |
+  +===================================================================+
+
+---
+
+### 3. Final Output Format
+Provide the output entirely in clean Markdown, with ASCII tables and code blocks properly formatted inside standard code fences (```) so alignment stays perfectly intact.
+
+---
+
+### RAW KAFKA NOTES TO PROCESS:
+[Paste your raw Apache Kafka notes here]
