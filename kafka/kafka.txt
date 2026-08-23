@@ -150,6 +150,35 @@ If a topic has 5 partitions:
 up to 5 consumers can read in parallel (per consumer group)
 Without partitions, only one consumer would be useful.
 
+Sticky Partition
+
+A sticky partitioner is a record batching strategy used by Kafka producers to improve performance when sending messages without explicit keys.
+
+The sticky partitioner was created to solve a critical flaw in Apache Kafka's original producer design: poor batching when messages didn't have keys.
+
+The Problem It Solves (Round-Robin Inefficiency)
+Prior to Kafka 2.4, when a producer sent records without keys, it used a basic Round-Robin approach. It placed Record 1 in Partition 0, Record 2 in Partition 1, Record 3 in Partition 2, and so on.
+
+Because messages were split across multiple partitions one by one, batch buffers filled up slowly. The producer had to send many tiny network requests, causing higher latency and increased CPU overhead.
+
+Round-Robin (Old):
+Batch Partition 0: [Record 1]  ──► Sent immediately (small payload)
+Batch Partition 1: [Record 2]  ──► Sent immediately (small payload)
+Batch Partition 2: [Record 3]  ──► Sent immediately (small payload)
+
+To achieve ultra-high throughput, a Kafka producer does not send every message to the broker individually. Instead, it holds messages in memory buffers and waits to group them into a single batch before making a network request.
+
+How the Sticky Partitioner Works
+
+Sticky Partitioning (Default):
+Partition 0: [Record 1, Record 2, Record 3, Record 4] ──► Sent as ONE dense batch
+(Next batch "sticks" to Partition 1, then Partition 2, etc.)
+
+A batch is triggered and sent to the broker when either of these limits is met first:
+
+batch.size: The memory limit for a single partition's batch buffer is reached (e.g., 16 KB).
+
+linger.ms: The maximum amount of time a message is allowed to sit waiting in the buffer (e.g., 10 ms).
 
 ======================== Partition key ========================
 
@@ -200,6 +229,25 @@ P0:
 Kafka partitions can be scaled horizontally by increasing the partition count, but increasing partitions can change key-to-partition mapping and therefore affect ordering guarantees for keyed messages.
 3 partitions → 6 partitions
         ✅ possible
+
+
+======================== Message ========================
+
++-------------------------------------------------------------+
+|                    Kafka Message (Record)                   |
++-------------------------------------------------------------+
+| Topic: "orders"                                             |
+| Partition: (Decided by Key or Round-robin)                  |
+| Key: "order-12345" (Ensures Ordering per Key)               |
+| Value: {                                                    |
+|   "order_id": "12345",                                      |
+|   "customer": "John Doe",                                   |
+|   "amount": 250.75,                                         |
+|   "status": "pending"                                       |
+| }                                                           |
+| Headers: { "source": "web-app", "timestamp": "1700000000000" }|
+| Timestamp: "1700000000000"                                  |
++-------------------------------------------------------------+
 
 ======================== Consumer Groups & Partition Assignment ========================
 
@@ -1265,42 +1313,3 @@ Offset + commit sementics
 Lag monitoring nobigy builds
 Retention policy + storage bill 
 Broakers to run and upgrage  
-
-
-Act as an expert technical writer and Apache Kafka specialist. 
-
-I have a set of complete raw notes on Apache Kafka, but the structure is messy and topics are scattered (for example, a term might be defined on line 100, but its deeper explanation or configuration appears on line 400). 
-
-Please reorganize, consolidate, and visually format my raw notes using the following strict constraints:
-
----
-
-### 1. Structure & Organization
-* **Consolidate Topics:** Group all related concepts, definitions, configurations, and deep-dives into single, unified sections (e.g., all information about Partitions, Producers, Consumers, Broker Architecture, ZooKeeper/KRaft, Topics, Offsets, and Retention should each live in their own dedicated, single section).
-* **Logical Hierarchy:** Order the consolidated sections logically, starting from high-level architecture/concepts to core components, configurations, and advanced features.
-* **Minimal Loss Strategy:** Merge duplicate points and remove redundant phrasing, but **preserve all core facts, technical specifics, code snippets, and configuration keys**. Minimize content removal.
-
----
-
-### 2. Formatting & Visual Style
-* **ASCII Layouts & Tables:** Use monospaced ASCII tables and boxed borders (using characters like `+`, `-`, `|`, `=`, `+---`, etc.) for comparisons, architecture summaries, and key configuration parameters. Ensure columns align cleanly for monospaced fonts (e.g., Consolas, Courier New, Cascadia Code).
-* **Emojis:** Use clean, professional visual anchors/emojis to flag specific entry types:
-  * 📌 Definitions & Key Concepts
-  * ⚙️ Configurations & Parameters
-  * 💡 Important Tips & Best Practices
-  * ⚠️ Warnings & Common Pitfalls
-  * 🔄 Architectural Flow / Processing Steps
-* **Section Separators:** Use distinct ASCII divider lines to separate major subtopics clean and visibly, such as:
-  +===================================================================+
-  |                          SECTION TITLE                            |
-  +===================================================================+
-
----
-
-### 3. Final Output Format
-Provide the output entirely in clean Markdown, with ASCII tables and code blocks properly formatted inside standard code fences (```) so alignment stays perfectly intact.
-
----
-
-### RAW KAFKA NOTES TO PROCESS:
-[Paste your raw Apache Kafka notes here]
