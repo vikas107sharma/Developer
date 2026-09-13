@@ -1,0 +1,916 @@
+JAVASCRIPT NOTES
+
+1. var, let AND const
+
+JavaScript has three keywords for declaring variables: var, let, and
+const.
+
+var - Function-scoped. - Can be redeclared in the same scope. - Can be
+reassigned. - Hoisted and initialized with undefined.
+
+let - Block-scoped. - Cannot be redeclared in the same scope. - Can be
+reassigned. - Hoisted but remains uninitialized in the Temporal Dead
+Zone (TDZ) until execution reaches its declaration.
+
+const - Block-scoped. - Cannot be redeclared in the same scope. - Cannot
+be reassigned. - Must be initialized when declared. - For objects and
+arrays, const prevents reassignment of the variable, but the
+object/array itself can still be mutated.
+
+Example:
+
+let age = 20; age = 21; // Allowed
+
+const name = “Vikas”; // name = “Rahul”; // TypeError
+
+var x = 10; var x = 20; // Allowed
+
+2. DATA TYPES
+
+JavaScript data types are divided into two broad categories:
+
+1.  Primitive data types
+2.  Non-primitive (reference) data types
+
+2.1 Primitive Data Types
+
+Primitive values are immutable, meaning the value itself cannot be
+changed after it is created.
+
+Primitive data types: - Number - String - Boolean - Undefined - Null -
+BigInt - Symbol
+
+String immutability:
+
+let str = “Vikas”; str[0] = “K”; // Does not modify the string
+console.log(str); // “Vikas”
+
+The string value itself cannot be changed. Operations that appear to
+modify a string actually create a new string.
+
+2.2 undefined vs null
+
+undefined: - Represents the absence of an assigned value. - Usually
+occurs when JavaScript has declared a variable but no value has been
+assigned to it. - It can also be explicitly assigned, although that is
+usually discouraged.
+
+Example:
+
+let user; console.log(user); // undefined
+
+const user; // SyntaxError: Missing initializer in const declaration
+
+null: - Represents an intentional absence of a value. - Usually assigned
+explicitly by the developer.
+
+Example:
+
+let selectedUser = null;
+
+Type conversion:
+
+console.log(Number(null)); // 0 console.log(Number(true)); // 1
+console.log(Number(undefined)); // NaN
+
+IMPORTANT: Do not confuse type conversion with comparison.
+
+For loose equality (==), JavaScript performs type coercion according to
+its comparison rules:
+
+console.log(null == undefined); // true console.log(null >= undefined);
+// false
+
+Number(null == undefined) // 1 Number(null >= undefined) // 0
+
+The expression null == undefined is evaluated first, producing true.
+Then Number(true) produces 1.
+
+For production code, prefer strict equality (===) unless you have a
+deliberate reason to use ==.
+
+2.3 Primitive Assignment = Copy by Value
+
+When a primitive value is assigned to another variable, the value is
+copied.
+
+Example:
+
+let a = 10; let b = a; // Value 10 is copied
+
+b = 20;
+
+console.log(a); // 10 console.log(b); // 20
+
+2.4 Floating-Point Precision
+
+JavaScript Number uses IEEE 754 double-precision floating-point
+representation.
+
+Example:
+
+let a = 0.1; let b = 0.2; let c = a + b;
+
+console.log(c); // 0.30000000000000004 console.log(c == 0.3); // false
+
+This happens because values such as 0.1 and 0.2 cannot always be
+represented exactly in binary floating-point format.
+
+If you only need formatted output:
+
+console.log(c.toFixed(1)); // “0.3” console.log(c.toFixed(1) === “0.3”);
+// true
+
+IMPORTANT: toFixed() returns a STRING, not a Number.
+
+For financial calculations, do not blindly rely on floating-point
+arithmetic. Prefer integer units (for example, paise instead of rupees)
+or a decimal/numeric library when exact decimal arithmetic is required.
+
+3. NON-PRIMITIVE / REFERENCE DATA TYPES
+
+Non-primitive values are mutable objects and are handled through
+references.
+
+Common non-primitive types: - Object - Array - Function
+
+Important: Arrays and functions are objects in JavaScript.
+
+typeof [] // “object” typeof {} // “object” typeof function() {} //
+“function”
+
+The statement “function -> type is always object” is not correct. typeof
+a function returns “function”, although functions are objects internally
+and can have properties.
+
+3.1 Arrays Are Mutable
+
+const arr = [1, 2, 3];
+
+arr[0] = 4; // Allowed console.log(arr); // [4, 2, 3]
+
+const does NOT make the array immutable. It only prevents the variable
+arr from being reassigned.
+
+arr = [5, 6, 7]; // TypeError
+
+3.2 typeof Examples
+
+const arr = [1, “hello”, true, 9.3];
+
+const obj = { name: “Vikas” };
+
+const fun = function() {};
+
+console.log(typeof arr); // “object” console.log(typeof obj); //
+“object” console.log(typeof fun); // “function” console.log(typeof
+null); // “object”
+
+IMPORTANT: typeof null === “object” is a historical JavaScript quirk. It
+does NOT mean null is actually an object.
+
+4. OBJECTS
+
+Example:
+
+const user = { name: “abc”, “home address”: “street part”,
+
+    greeting: function() {
+        console.log(`Hi ${this.name}`);
+    }
+
+};
+
+Object keys are strings (or Symbols). These are equivalent:
+
+const user = { name: “abc” };
+
+user.name; user[“name”];
+
+Why use this.name inside the method?
+
+const user = { name: “abc”,
+
+    greeting: function() {
+        console.log(`Hi ${this.name}`);
+    }
+
+};
+
+user.greeting(); // Hi abc
+
+Inside a normal method call such as user.greeting(), this refers to the
+object used to call the method.
+
+Using user.name directly would tightly couple the function to the
+variable named user.
+
+this.name is more reusable:
+
+const user2 = { name: “Rahul”, greeting: user.greeting };
+
+user2.greeting(); // Hi Rahul
+
+4.1 Object Assignment = Copy by Reference
+
+Example:
+
+const obj1 = { name: “Vikas” };
+
+const obj2 = obj1; // Both variables refer to the same object
+
+obj2.name = “Rahul”;
+
+console.log(obj1.name); // “Rahul” console.log(obj2.name); // “Rahul”
+
+No new object was created. Both variables reference the same object.
+
+5. OBJECT METHODS
+
+Object.keys(obj) - Returns an array containing the object’s own
+enumerable property names.
+
+Object.values(obj) - Returns an array containing the object’s own
+enumerable property values.
+
+Object.entries(obj) - Returns an array of [key, value] pairs.
+
+Example:
+
+const user = { name: “Vikas”, age: 25 };
+
+console.log(Object.keys(user)); // [“name”, “age”]
+
+console.log(Object.values(user)); // [“Vikas”, 25]
+
+console.log(Object.entries(user)); // [[“name”, “Vikas”], [“age”, 25]]
+
+Iterating over entries:
+
+for (const [key, value] of Object.entries(user)) { console.log(key,
+value); }
+
+IMPORTANT: These are Object methods:
+
+Object.keys(obj) Object.values(obj) Object.entries(obj)
+
+Not:
+
+obj.keys obj.values obj.entries
+
+6. SHALLOW COPY vs DEEP COPY
+
+Shallow copy: - Creates a new outer object/array. - Nested objects are
+still shared by reference.
+
+Example:
+
+const original = { name: “Vikas”, address: { city: “Gurugram” } };
+
+const copy = { …original };
+
+copy.name = “Rahul”; // Does not affect original copy.address.city =
+“Delhi”; // Affects original
+
+console.log(original.address.city); // “Delhi”
+
+Deep copy: - Creates independent copies of nested objects as well.
+
+Modern JavaScript:
+
+const copy = structuredClone(original);
+
+copy.address.city = “Delhi”;
+
+console.log(original.address.city); // “Gurugram”
+
+JSON-based copying:
+
+const copy = JSON.parse(JSON.stringify(original));
+
+This has limitations: - Loses undefined values. - Loses functions. -
+Does not correctly preserve all JavaScript types. - Does not handle
+circular references.
+
+Prefer structuredClone() when its supported data types meet your
+requirements.
+
+7. RANDOM NUMBERS AND OTP
+
+Math.random() returns a pseudo-random floating-point number in the
+range:
+
+0 <= Math.random() < 1
+
+It is NOT cryptographically secure.
+
+Random integer between min and max, inclusive:
+
+function randomInt(min, max) { return Math.floor(Math.random() * (max -
+min + 1)) + min; }
+
+Example:
+
+const otp = randomInt(1000, 9999); console.log(otp);
+
+Why Math.random() is not suitable for security-sensitive OTPs: - It is
+designed for general-purpose pseudo-randomness. - It is not a
+cryptographically secure random number generator. - An OTP used for
+authentication should use a cryptographically secure source.
+
+For security-sensitive random values in Node.js:
+
+const crypto = require(“crypto”);
+
+const otp = crypto.randomInt(1000, 10000); console.log(otp);
+
+crypto.randomInt(min, max) uses a cryptographically secure random source
+provided by the operating system.
+
+For browser JavaScript:
+
+const array = new Uint32Array(1); crypto.getRandomValues(array);
+
+Do NOT implement cryptographic randomness using CPU usage, RAM usage,
+system temperature, etc. yourself. Operating systems provide dedicated
+sources of entropy and secure random number generation.
+
+8. EXECUTION CONTEXT
+
+An execution context is the environment in which JavaScript code is
+evaluated.
+
+At a simplified level, think of execution as:
+
+1.  Creation / memory setup phase
+2.  Execution phase
+
+The exact specification is more detailed than simply “memory allocation
+and execution”, but this model is useful for understanding hoisting and
+the TDZ.
+
+Example:
+
+console.log(a);
+
+let a = 10;
+
+For let: - The binding for a exists during the creation phase. - It is
+not initialized. - Accessing it before initialization causes a
+ReferenceError. - This period is called the Temporal Dead Zone (TDZ).
+
+Example:
+
+console.log(a); // ReferenceError let a = 10;
+
+For var:
+
+console.log(a); // undefined var a = 10;
+
+var declarations are hoisted and initialized with undefined.
+
+8.1 Function Declaration Hoisting
+
+Function declarations are available before their declaration in the same
+scope.
+
+Example:
+
+const a = 10; const b = 20;
+
+const sum = addNum(a, b);
+
+function addNum(num1, num2) { const sum = num1 + num2; return sum; }
+
+console.log(sum); // 30
+
+8.2 Function Expression
+
+A function expression assigned to a let/const variable is NOT callable
+before the variable is initialized.
+
+Example:
+
+const a = 10; const b = 20;
+
+const difference = subNum(a, b); // ReferenceError
+
+const subNum = function(num1, num2) { const difference = num1 - num2;
+return difference; };
+
+The same applies to arrow functions:
+
+const result = add(a, b); // ReferenceError
+
+const add = (a, b) => a + b;
+
+Simplified memory model:
+
+Creation phase:
+
+a = 10 b = 20 addNum = function code difference = uninitialized
+
+Execution phase:
+
+addNum(a, b) -> new function execution context is created -> parameters
+are initialized -> function body executes -> result is returned
+
+9. FUNCTION EXECUTION CONTEXT
+
+When a function is called, JavaScript creates a new execution context
+for that function.
+
+Example:
+
+function addNum(num1, num2) { const sum = num1 + num2; return sum; }
+
+addNum(10, 20);
+
+Conceptually, inside the function context:
+
+num1 = 10 num2 = 20 sum = 30
+
+Then the function returns 30 and its execution context is removed from
+the call stack.
+
+Important: The exact storage behavior is engine-dependent. Do not think
+of JavaScript variables as literally always living in a specific “stack
+memory” or “heap memory” location.
+
+10. SCOPE
+
+Scope determines where a variable can be accessed.
+
+Global scope: - A variable declared in the global scope can be accessed
+from code that has access to that global scope.
+
+Example:
+
+const num = 5;
+
+function printNum() { console.log(num); }
+
+Function scope: - var is function-scoped. - A var declared inside a
+function cannot be accessed outside that function.
+
+Example:
+
+function test() { var a = 10; }
+
+console.log(a); // ReferenceError
+
+Block scope: - let and const are block-scoped. - A block is commonly
+represented by { }.
+
+Example:
+
+if (true) { const a = 1; let b = 2; }
+
+console.log(a); // ReferenceError console.log(b); // ReferenceError
+
+IMPORTANT: let and const are block-scoped. var is function-scoped.
+
+11. CLOSURE
+
+A closure occurs when a function remembers and retains access to
+variables from its lexical scope even after the outer function has
+finished executing.
+
+Example:
+
+function counter() { let start = 0;
+
+    const increase = () => {
+        start++;
+        return start;
+    };
+
+    return increase;
+
+}
+
+const increment = counter();
+
+console.log(increment()); // 1 console.log(increment()); // 2
+console.log(increment()); // 3
+
+What happens:
+
+1.  counter() executes.
+2.  start is created.
+3.  increase is created.
+4.  counter() returns increase.
+5.  counter() finishes.
+6.  increase still needs start.
+7.  Therefore, start remains reachable through the closure.
+8.  Each call to increment() updates the same start variable.
+
+IMPORTANT: It is inaccurate to say “start is stored on the heap because
+it is a closure.” The JavaScript specification does not require a
+particular physical stack/heap layout. The important concept is that the
+variable remains reachable and available to the closure.
+
+12. ARRAY METHODS: filter, map, reduce
+
+Example:
+
+const arr = [10, 20, 30, 40, 50];
+
+12.1 filter()
+
+filter() creates a NEW array containing only the elements for which the
+callback returns true.
+
+Example:
+
+const result = arr.filter(number => number > 25);
+
+console.log(result); // [30, 40, 50]
+
+Callback arguments:
+
+arr.filter((number, index, array) => { // number -> current element //
+index -> current index // array -> original array return number <= 20;
+});
+
+Example:
+
+const result = arr.filter((number, index, array) => number <= 20);
+
+console.log(result); // [10, 20]
+
+12.2 map()
+
+map() creates a NEW array by transforming every element.
+
+It does NOT modify the original array unless the callback itself mutates
+something.
+
+Example:
+
+const arr = [10, 20, 30];
+
+const result = arr.map(number => number * 2);
+
+console.log(result); // [20, 40, 60]
+
+console.log(arr); // [10, 20, 30]
+
+Callback arguments are also:
+
+map((element, index, array) => …)
+
+12.3 reduce()
+
+reduce() processes all elements and accumulates them into a single
+result.
+
+Example:
+
+const arr = [10, 20, 30, 40, 50];
+
+const sum = arr.reduce((acc, number) => { return acc + number; }, 0);
+
+console.log(sum); // 150
+
+Common use cases: - Sum - Product - Grouping - Counting - Building
+objects - Converting an array into another data structure
+
+12.4 When to use them
+
+filter() -> “Give me only the elements that satisfy this condition.”
+
+map() -> “Transform every element.”
+
+reduce() -> “Combine all elements into one accumulated result.”
+
+13. IMPLEMENTING YOUR OWN filter()
+
+Suppose we want to implement a custom filter.
+
+Example:
+
+const arr = [10, 20, 30, 40, 50];
+
+const compare = number => number > 25;
+
+arr.myFilter = function(compare) { const result = [];
+
+    for (const item of this) {
+        if (compare(item)) {
+            result.push(item);
+        }
+    }
+
+    return result;
+
+};
+
+console.log(arr.myFilter(compare)); // [30, 40, 50]
+
+IMPORTANT: Inside the function above, use this, not this.arr.
+
+When arr.myFilter(…) is called, this refers to arr.
+
+13.1 Making myFilter() available to all arrays
+
+To add a method to Array instances:
+
+Array.prototype.myFilter = function(compare) { const result = [];
+
+    for (const item of this) {
+        if (compare(item)) {
+            result.push(item);
+        }
+    }
+
+    return result;
+
+};
+
+const arr = [10, 20, 30, 40, 50];
+
+console.log(arr.myFilter(number => number > 25)); // [30, 40, 50]
+
+IMPORTANT: Modifying built-in prototypes globally is generally NOT
+recommended in production applications.
+
+Risks: - Name collisions with future JavaScript features or libraries. -
+Unexpected behavior across the application. - Makes code harder to
+reason about. - Can cause compatibility issues.
+
+It is useful for learning how prototypes work, but avoid it in
+production unless there is a strong, controlled reason.
+
+14. PROTOTYPE
+
+JavaScript objects can inherit properties and methods through the
+prototype chain.
+
+Example:
+
+const arr = [10, 20, 30];
+
+console.log(arr.filter); console.log(arr.toString);
+console.log(arr.map);
+
+When inspecting an array in browser DevTools, you may see:
+
+The array inherits methods from Array.prototype.
+
+Conceptually:
+
+arr | v Array.prototype | v Object.prototype | v null
+
+This is why methods such as: - filter() - map() - reduce() - push() -
+pop() - toString()
+
+are available on arrays even though they are not stored as individual
+methods on every array instance.
+
+15. SORTING
+
+Array.sort() sorts the array in place and returns the same array.
+
+For numbers, always provide a comparator.
+
+Ascending:
+
+const products = products.sort((a, b) => a.price - b.price);
+
+Descending:
+
+const products = products.sort((a, b) => b.price - a.price);
+
+Example:
+
+const numbers = [30, 10, 20];
+
+numbers.sort((a, b) => a - b);
+
+console.log(numbers); // [10, 20, 30]
+
+IMPORTANT: sort() mutates the original array.
+
+If you need a non-mutating sort and your runtime supports toSorted():
+
+const sortedProducts = products.toSorted( (a, b) => b.price - a.price );
+
+16. SET
+
+Set stores unique values.
+
+Example:
+
+const arr = [10, 20, 30, 40, 50, 50];
+
+const uniqueElements = […new Set(arr)];
+
+console.log(uniqueElements); // [10, 20, 30, 40, 50]
+
+Set is useful when: - You need uniqueness. - You frequently check
+whether a value exists. - You need to remove duplicates.
+
+17. MAP
+
+Map is a key-value collection.
+
+Unlike a normal object, Map allows keys of any type.
+
+Example:
+
+const mp = new Map([ [“Rohit”, 40], [2, “Rohit”]]);
+
+Access values:
+
+console.log(mp.get(“Rohit”)); // 40 console.log(mp.get(2)); // “Rohit”
+
+Check a key:
+
+console.log(mp.has(“Rohit”)); // true
+
+Add a value:
+
+mp.set(“Vikas”, 25);
+
+Delete a value:
+
+mp.delete(“Vikas”);
+
+Iterate over a Map:
+
+for (const [key, value] of mp) { console.log(key, value); }
+
+Or explicitly:
+
+for (const [key, value] of mp.entries()) { console.log(key, value); }
+
+18. QUICK INTERVIEW REVISION
+
+var - Function-scoped. - Redeclarable. - Reassignable. - Hoisted and
+initialized to undefined.
+
+let - Block-scoped. - Not redeclarable in the same scope. -
+Reassignable. - TDZ before initialization.
+
+const - Block-scoped. - Not redeclarable. - Not reassignable. - Must be
+initialized during declaration. - Objects/arrays referenced by const can
+still be mutated.
+
+Primitive - Number - String - Boolean - undefined - null - BigInt -
+Symbol - Primitive values are immutable.
+
+Reference / non-primitive - Objects - Arrays - Functions - Usually
+mutable. - Variables hold references to these objects.
+
+undefined - Generally means no value has been assigned.
+
+null - Intentional absence of a value.
+
+typeof - typeof null -> “object” (historical quirk) - typeof [] ->
+“object” - typeof {} -> “object” - typeof function() {} -> “function”
+
+Closure - A function retains access to variables from its lexical
+environment even after the outer function has returned.
+
+filter() - Returns a new array containing elements that pass a
+condition.
+
+map() - Returns a new array containing transformed elements.
+
+reduce() - Reduces an array to one accumulated result.
+
+Set - Stores unique values.
+
+Map - Stores key-value pairs. - Keys can be any value.
+
+sort() - Mutates the original array. - Numeric sorting requires a
+comparator.
+
+Prototype - Objects can inherit properties and methods through the
+prototype chain.
+
+Math.random() - Pseudo-random. - Not suitable for security-sensitive OTP
+generation.
+
+crypto.randomInt() - Suitable for generating cryptographically secure
+random integers in Node.js.
+
+
+// ---------------------------------------------------------
+
+// 🏹 1. Arrow Functions & Context (`this`)
+// Concept: Arrow functions do not have their own `this` binding.
+
+const obj1 = {
+    name: "A",
+    get: function() {
+        console.log(this.name);
+    },
+    getArrow: () => {
+        console.log(this.name);
+    }
+};
+
+console.log("--- 1. Arrow Functions ---");
+obj1.get();      // Output: A (Regular function binds `this` to the object calling it)
+obj1.getArrow(); // Output: undefined (Arrow function inherits `this` from the global scope)
+
+// ---------------------------------------------------------
+
+// 🏢 2. Lexical `this` in Nested Scopes
+// Concept: How different function declarations handle execution context.
+
+const obj2 = {
+  name: 'Backend Node',
+  regularFn: function () {
+    console.log(this.name);
+  },
+  arrowFn: () => {
+    console.log(this.name);
+  },
+  nestedFn: function () {
+    const innerArrow = () => console.log(this.name);
+    innerArrow();
+  }
+};
+
+console.log("\\n --- 2. Lexical `this` ---");
+obj2.regularFn(); // Output: Backend Node (`this` is dynamically bound to `obj2`)
+obj2.arrowFn();   // Output: undefined (Inherits `this` from enclosing scope, e.g., global/module)
+obj2.nestedFn();  // Output: Backend Node (Inner arrow inherits `this` from `nestedFn`)
+
+// ---------------------------------------------------------
+
+// 🔄 3. The Node.js Event Loop (I/O vs Timers)
+// Concept: Phase prioritization in the Node.js Event Loop.
+
+const fs = require('fs');
+
+console.log("\\n--- 3. Event Loop (Running Async...) ---");
+fs.readFile(__filename, () => {
+  setTimeout(() => {
+    console.log('Timeout');
+  }, 0);
+
+  setImmediate(() => {
+    console.log('Immediate');
+  }, 0);
+  
+  // Explanation: Inside an I/O callback (poll phase), the Event Loop moves next to 
+  // the Check phase (setImmediate) before circling back to the Timers phase (setTimeout).
+});
+
+// ---------------------------------------------------------
+
+// 📦 4. Scope Closures (`var` vs `let`)
+// Concept: Block-scoping vs Function-scoping in asynchronous loops.
+
+setTimeout(() => {
+    console.log("\\n--- 4. Scope Closures (`var` vs `let`) ---");
+    
+    // `var` is function-scoped. There is only one shared variable `i`.
+    // By the time the timer finishes, the loop has completed and `i` equals 3.
+    for (var i = 0; i < 3; i++) {
+      setTimeout(() => {
+        console.log(`var i: ${i}`);
+      }, 100);
+    }
+
+    // `let` is block-scoped. Each loop iteration creates a new binding for `j`.
+    for (let j = 0; j < 3; j++) {
+      setTimeout(() => {
+        console.log(`let j: ${j}`);
+      }, 100);
+    }
+}, 50);
+
+// ---------------------------------------------------------
+
+// 🔗 5. Pass by Reference vs. Pass by Value
+// Concept: How JavaScript handles memory mutations for objects vs primitives.
+
+function modifyArray(arr, num) {
+  arr.push(4); // Objects & Arrays: Passed by reference. Mutates original.
+  num = 100;   // Primitives: Passed by value. Local copy only.
+}
+
+const numbers = [1, 2, 3];
+let val = 10;
+
+modifyArray(numbers, val);
+
+console.log("\\n--- 5. Reference vs Value ---");
+console.log(numbers); // Output: [ 1, 2, 3, 4 ]
+console.log(val);     // Output: 10
+
+// ---------------------------------------------------------
+
+// 🎭 6. Type Coercion
+// Concept: Implicit casting during operations.
+
+console.log("\\n--- 6. Type Coercion ---");
+console.log('5' + 2);   // Output: 52 (The + operator with a string triggers concatenation)
+console.log('5' - 2);   // Output: 3 (String coerced to number)
+console.log('5' * '2'); // Output: 10 (Strings coerced to numbers)
+console.log(false + 1); // Output: 1 (false coerces to 0)
