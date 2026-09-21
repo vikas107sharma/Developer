@@ -310,22 +310,31 @@ brokers, controlled by `replication_factor`. See
                             [ Offset:103 ]
 ```
 
-The broker is responsible for four things:
+📌 A broker is a single Kafka **server node** inside the cluster. Its job is
+message storage and client I/O — the *data worker*. It has four responsibilities:
 
-**1. Storage & persistence** — stores records 100, 101 and 102 sequentially on
-disk inside partition P2.
+**1. Message ingestion & serving** — receives messages from producers, writes
+them to **append-only disk logs**, and serves read requests to consumers. In the
+diagram above that means storing records 100, 101 and 102 sequentially inside
+partition P2, then handing them to Consumer 1 on request.
 
-**2. Offset tracking** — receives and saves the consumer group's committed offset.
+**2. Partition leadership** — hosts topic partitions. If this broker is
+designated the **Leader** for a partition, it handles **all writes** for that
+partition, and all reads in the common setup. See
+[Part 4](#part-4-replication-leadership-and-durability).
 
-**3. Fetch handling** — serves records to Consumer 1 when requested, and updates
-what has been delivered.
+**3. Replication** — if it hosts a **Follower** replica instead, it *fetches*
+data from the Leader broker to maintain redundancy across the cluster. Followers
+pull; the leader never pushes.
 
-**4. Failover coordination** — when Consumer 1 crashes, the **group
-coordinator** detects the failure via missed heartbeats, rebalances the group,
-and the new consumer resumes fetching from the committed offset. The group
-coordinator is one specific broker elected to manage that particular consumer
-group — not "any broker", and **not** the KRaft controller, which handles
-*broker* failure rather than *consumer* failure. See
+**4. Group management** — acts as the **Group Coordinator** for specific consumer
+groups: manages heartbeats, triggers rebalances, and stores committed offsets in
+the `__consumer_offsets` topic (see
+[Part 8](#part-8-offsets-and-delivery-semantics)).
+
+⚠️ The group coordinator is one **specific** broker elected to manage that
+particular consumer group — not "any broker", and **not** the KRaft controller,
+which handles *broker* failure rather than *consumer* failure. See
 [Part 10](#part-10-failure-handling).
 
 Notice what the broker does **not** do — this is the source of much of its speed.
@@ -1300,7 +1309,28 @@ Kafka needs *someone* to coordinate:
   - metadata
 ```
 
-That someone is the **Kafka controller**.
+That someone is the **Kafka controller** — the *brain* of the cluster.
+
+⚙️ **Who runs the role.** In modern Kafka (**KRaft mode**) a quorum of dedicated
+controller nodes runs it. In legacy setups, one broker is elected the active
+Controller via **ZooKeeper**.
+
+### 📌 The controller's four responsibilities
+
+**1. Partition leader election** — tracks broker health. If a broker holding a
+partition **leader** fails, the controller elects a new leader from the remaining
+**In-Sync Replicas (ISR)**. See [Part 4](#part-4-replication-leadership-and-durability).
+
+**2. Metadata authority** — manages the **canonical** state of the cluster:
+topics, partition counts, replica locations, configuration changes and **ACLs**.
+Brokers do not vote on this; they learn it.
+
+**3. Cluster reconfiguration** — handles topic creation, topic deletion and
+partition expansion, propagating state updates to every broker so they each know
+which nodes lead which partitions.
+
+**4. Broker lifecycle** — detects when brokers **join, leave or crash**, and
+triggers the necessary state transitions across the cluster.
 
 Concretely — imagine topic `orders`:
 
@@ -1480,17 +1510,25 @@ unavailable, and can then perform metadata and leadership changes.
 ### 📌 Broker vs Controller — the distinction that matters
 
 ```
-+------------------------+-------------------------------+-------------------------------+
-| Dimension              | Broker (data plane)           | Controller (control plane)    |
-+========================+===============================+===============================+
-| Handles                | produce, consume, store,      | leader assignment, broker     |
-|                        | replicate                     | membership, metadata,         |
-|                        |                               | partition state               |
-+------------------------+-------------------------------+-------------------------------+
-| Touches message bytes  | Yes                           | No                            |
-+------------------------+-------------------------------+-------------------------------+
-| Knows who leads P2     | Learns it from metadata       | Decides it                    |
-+------------------------+-------------------------------+-------------------------------+
++------------------------+---------------------------------+---------------------------------+
+| Dimension              | Broker (data plane)             | Controller (control plane)      |
++========================+=================================+=================================+
+| Nickname               | The data worker                 | The cluster manager             |
++------------------------+---------------------------------+---------------------------------+
+| Handles                | Produce, consume, store,        | Leader election, broker         |
+|                        | replicate, group coordination   | membership, metadata, topic     |
+|                        |                                 | lifecycle, ACLs                 |
++------------------------+---------------------------------+---------------------------------+
+| Touches message bytes  | Yes                             | No                              |
++------------------------+---------------------------------+---------------------------------+
+| Knows who leads P2     | Learns it from metadata         | Decides it                      |
++------------------------+---------------------------------+---------------------------------+
+| Runs on                | Every node in the cluster       | A KRaft quorum, or one elected  |
+|                        |                                 | broker under ZooKeeper          |
++------------------------+---------------------------------+---------------------------------+
+| Failure it reacts to   | Consumer failure, as group      | Broker failure                  |
+|                        | coordinator                     |                                 |
++------------------------+---------------------------------+---------------------------------+
 ```
 
 ⚙️ Modern Kafka deployments can use **separate** controller roles or **combined**
