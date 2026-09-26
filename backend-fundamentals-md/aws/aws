@@ -1,0 +1,90 @@
++---------------------------------------------------------------------------------------------------+
+| AWS ELASTIC LOAD BALANCING (ELB)                                                                  |
++-----------------------------------+-----------------------------------+---------------------------+
+| APPLICATION LOAD BALANCER (ALB)   | NETWORK LOAD BALANCER (NLB)       | GATEWAY LOAD BALANCER     |
+|                                   |                                   | (GWLB)                    |
++-----------------------------------+-----------------------------------+---------------------------+
+| Layer 7 (Application Level)       | Layer 4 (Transport Level)         | Layer 3 / 4 (IP / Packet) |
+| Protocols: HTTP, HTTPS, gRPC      | Protocols: TCP, UDP, TLS          | Protocols: GENEVE / IP    |
+|                                   |                                   |                           |
+| Features:                         | Features:                         | Features:                 |
+| - Request-level routing           | - Connection-level routing        | - Deploys fleet of 3rd-   |
+| - Flexible feature set for apps   | - Ultra-high performance          |   party virtual appliances|
+| - Advanced routing & visibility   | - TLS offloading at scale         | - Improves security,      |
+|   for modern architectures        | - Centralized cert deployment     |   compliance, and policy  |
+|                                   | - Static IP address support       |   controls                |
++-----------------------------------+-----------------------------------+---------------------------+
+                                                  |
+                                                  v
++---------------------------------------------------------------------------------------------------+
+| TARGET ARCHITECTURE (VPC / VPCe)                                                                  |
+|                                                                                                   |
+|    +-------------------------+     +-------------------------+     +-------------------------+    |
+|    |  APP / CONTAINER FLEET  |     |  HIGH-SPEED TARGETS     |     |  SECURITY APPLIANCES    |    |
+|    |  (Routed by ALB)        |     |  (Routed by NLB)        |     |  (Routed by GWLB)       |    |
+|    +-------------------------+     +-------------------------+     +-------------------------+    |
+|                                                                                                   |
++---------------------------------------------------------------------------------------------------+
+
+
++---------------------------------------------------------------------------------+
+| Auto Scaling Group (ASG): Automatically adds or removes EC2 instances           |
+|                           based on demand to ensure availability & save costs   |
++---------------------------------------------------------------------------------+
+
++---------------------------------------------------------------------------------+
+| AUTO SCALING GROUP                                                              |
+|                                                                                 |
+|      +---------------+   +---------------+   :- - - - - - - -:   :- - - - - - - -:
+|      | EC2 INSTANCE  |   | EC2 INSTANCE  |   : EC2 INSTANCE  :   : EC2 INSTANCE  :
+|      |   (Running)   |   |   (Running)   |   :  (Scale Out)  :   :  (Scale Out)  :
+|      +---------------+   +---------------+   :- - - - - - - -:   :- - - - - - - -:
+|                                                                                 |
+|      |               |                       |               |                  |
+|      +---------------+                       +---------------+                  |
+|        Minimum Size                            Scale Out As                     |
+|           (Min: 1)                                Needed                        |
+|                                                                                 |
+|      |                                       |                                  |
+|      +---------------------------------------+                                  |
+|                  Desired Capacity                                               |
+|                     (Desired: 3)                                                |
+|                                                                                 |
+|      |                                                                       |  |
+|      +-----------------------------------------------------------------------+  |
+|                                     Maximum Size                                |
+|                                       (Max: 4)                                  |
++---------------------------------------------------------------------------------+
+
+
+
++---------------------------------------------------------------------------------+
+| AWS S3 (Simple Storage Service): Highly reliable, scalable object storage       |
+|                                  accessible globally over the internet.         |
++---------------------------------------------------------------------------------+
+
++---------------------------------------------------------------------------------+
+| REGION (e.g., us-east-1)                                                        |
+|                                                                                 |
+|   +-------------------------------------------------------------------------+   |
+|   | S3 BUCKET (Globally Unique Name)                                        |   |
+|   |                                                                         |   |
+|   |   +-----------------------------------------------------------------+   |   |
+|   |   | S3 BUCKET POLICY (JSON-based Access Control)                    |   |   |
+|   |   | Defines permissions (Read, Write, Delete) for users & roles.    |   |   |
+|   |   +-----------------------------------------------------------------+   |   |
+|   |                                    |                                    |   |
+|   |                                    v                                    |   |
+|   |   +-----------------------------------------------------------------+   |   |
+|   |   | OBJECTS (Stored as Key-Value Pairs)                             |   |   |
+|   |   |                                                                 |   |   |
+|   |   |   Key: "images/photo.jpg" (Object Name / Path)                  |   |   |
+|   |   |   Value: [ Binary Data / File Content ]                         |   |   |
+|   |   |   -----------------------------------------------------------   |   |   |
+|   |   |   Key: "backups/db.tar.gz"                                      |   |   |
+|   |   |   Value: [ Binary Data / File Content ]                         |   |   |
+|   |   +-----------------------------------------------------------------+   |   |
+|   |                                                                         |   |
+|   +-------------------------------------------------------------------------+   |
+|                                                                                 |
++---------------------------------------------------------------------------------+
