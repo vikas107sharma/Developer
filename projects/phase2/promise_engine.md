@@ -164,6 +164,22 @@ the wrong order — you just get a wrong date that looks completely plausible."
 
 ================================================ Step 6 ================================================
 
+How do you handle massive traffic 
+What to say
+"On a normal day it's around 50K requests, but sale traffic is spiky. Most of the load arrives in short bursts when a sale opens, so the design is built for the burst, not the average. Four things carry it.
+
+One: the service is stateless on App Engine Standard, so it scales out by adding instances. All shared state lives in Redis and MySQL.
+
+Two: the request path makes no external calls. Polygons are converted to H3 cells ahead of time, ERP inventory is synced into our MySQL before the request arrives, and rain delays come from a background job. A spike only hits our own cache and database.
+
+Three: during a sale, shoppers cluster on the same pincodes, zones and warehouses, so those lookups are mostly served from Redis. Only capacity and tag delays are read fresh, because they change with every order.
+
+Four: capacity is the safety valve. As warehouse slots fill up, the capacity delay pushes promises later instead of overpromising. The counter is a single atomic update, so concurrent orders don't lose counts.
+
+On the cart side, the delivery-date call is one function in a parallel fan-out with a 5-second budget. If it's slow during a spike, the cart still loads."
+
+================================================ Step 6 ================================================
+
 The interviewer asks: "Why hand-roll IST time math instead of using a timezone library?"
 
 "The whole service runs in UTC. There's no timezone library in this codebase for the date math I
