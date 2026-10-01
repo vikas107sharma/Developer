@@ -41,6 +41,7 @@
 - [35. The 11:30 PM rule](#35-the-1130-pm-rule)
 - [36. Complete delivery calculation example](#36-complete-delivery-calculation-example)
 - [37. Now add a warehouse holiday](#37-now-add-a-warehouse-holiday)
+- [➕ The 8-stage buffer pipeline (what the resume means)](#the-8-stage-buffer-pipeline-what-the-resume-means)
 - [38. What if the item comes from two warehouses?](#38-what-if-the-item-comes-from-two-warehouses)
 - [39. Lesson 5 — Capacity feedback loop](#39-lesson-5--capacity-feedback-loop)
 - [40. Why the counter update must be atomic](#40-why-the-counter-update-must-be-atomic)
@@ -1257,6 +1258,83 @@ Why?
 
 Because the cart is solving the actual fulfillment problem.
 
+### /v2/edd — Product-level
+
+Answers:
+
+> “If I buy this one item, when can I get it?”
+
+```text
+1 item
+  ↓
+Find ONE warehouse with full quantity
+  ↓
+Calculate promise
+```
+
+- No splitting.
+- No parcels.
+- Uses that item's weight.
+- Read-only.
+- Used on product/listing pages.
+
+### /v2/cartedd — Cart-level
+
+Answers:
+
+> “If I buy this entire basket, how will it actually be shipped?”
+
+```text
+Entire cart
+   ↓
+Allocate stock
+   ↓
+Split across warehouses if needed
+   ↓
+Create parcels
+   ↓
+Calculate promise for each parcel
+```
+
+- Can split quantity across warehouses.
+- Uses parcel weight, not individual item weight.
+- Handles overlapping-zone inventory using the ledger.
+- Determines actual shipment structure.
+- Can count the order against warehouse capacity after placement.
+
+### Why can they give different dates?
+
+Example:
+
+Product alone:
+
+```text
+4 kg
+→ hyperlocal
+→ Today 10 PM
+```
+
+But cart:
+
+```text
+4 kg dog food
++ 5 kg cat litter
+= 9 kg parcel
+```
+
+Now the parcel weighs 9 kg, potentially changing its delivery type:
+
+```text
+→ next-day
+→ Tomorrow 10 PM
+```
+
+So remember:
+
+**EDD = “When can this item arrive?”**
+
+**Cart EDD = “How will my actual basket be fulfilled, and when will each shipment arrive?”**
+
 ## 13. Lesson 3 — Creating parcels
 
 Now we have fulfillment assignments.
@@ -1481,6 +1559,12 @@ SLA = 1 day
 So weight isn't just packing information.
 
 **It directly influences the delivery promise.**
+
+<!-- ➕ added:start -->
+
+**➕ See also:** [§12 — Why can they give different dates?](#why-can-they-give-different-dates). The same 4 kg item is hyperlocal on its own (`/v2/edd`), but next-day inside a 9 kg cart parcel (`/v2/cartedd`).
+
+<!-- ➕ added:end -->
 
 ## 21. Rule 2 — Cutoff
 
@@ -2239,6 +2323,78 @@ This is why the two-clock model matters.
                                            Monday 22:00
                                            "Monday 10 PM"
 ```
+
+<!-- ➕ added:end -->
+
+<!-- ➕ added:start -->
+
+## The 8-stage buffer pipeline (what the resume means)
+
+**➕ Added section**, explaining the resume line *"…and an **8-stage** buffer pipeline."*
+
+A **buffer** is extra time added on top of the courier's base delivery time (the SLA).
+The **8-stage buffer pipeline** is the fixed order of 8 adjustments that every shipment's delivery time passes through, from "now" to the promised date and time.
+Sections 20–35 above explain each stage one at a time. This section is the map that ties them together.
+
+| # | Stage | What it does | Operation | Covered in |
+|---|---|---|---|---|
+| 1 | **Cutoff** | After the daily cutoff (e.g. 6 PM), or outside the hyperlocal operating window, the start moves to a later day at a fixed time | SET | §21–23 |
+| 2 | **Static buffers** | Manual ops delays (warehouse issue, staff shortage, festival, maintenance). Can be set per cluster, per warehouse, or per cluster + warehouse; all are added together | ADD | §24 |
+| 3 | **Rain buffer** | Weather-driven delay. Applied only when there is no manual (static) delay | ADD | §25, §43–46 |
+| 4 | **Capacity buffer** | The warehouse slot is full (e.g. 100/100 orders), so extra delay is added | ADD | §26, §39–42 |
+| 5 | **Tag buffer** | Delay from product tags, e.g. Fragile +1 day or Priority −30 min. Can be negative | ADD | §27 |
+| 6 | **SLA** | Base courier time for the weight slab (e.g. hyperlocal 2 hours, next-day 1 day). Skipped if a hyperlocal cutoff already set the slot | ADD | §20, §28 |
+| 7 | **Pickup day-skip** | The warehouse can't dispatch that day, so the date moves forward and the time re-anchors | WALK | §29–30, §32–33 |
+| 8 | **Delivery day-skip** | The customer side can't receive that day, so the date moves forward | WALK | §31 |
+
+```text
+ now
+  │ 1  cutoff ............. SET    start = later day, fixed time
+  │ 2  static buffers ..... ADD    manual ops delays, summed
+  │ 3  rain buffer ........ ADD    only if there is no manual delay
+  │ 4  capacity buffer .... ADD    slot full → delay
+  │ 5  tag buffer ......... ADD    can be negative
+  │ 6  SLA ................ ADD    skipped after a hyperlocal cutoff
+  │ 7  pickup day-skip .... WALK   warehouse can't dispatch
+  │ 8  delivery day-skip .. WALK   customer can't receive
+  ▼
+ promise   (then time of day: SET 22:00, or 13:00 next day if ≥ 23:30)
+```
+
+### Why it's a "pipeline": the order changes the answer
+
+- **Cutoff comes first.** It sets the start time, and every later stage builds on it.
+- **A hyperlocal cutoff replaces the SLA** instead of adding to it (§23).
+- **Rain is a fallback, not an addition.** A manual delay beats rain (§25, §46).
+- **After a day-skip, the time re-anchors** to the configured start time (§33).
+
+### Example (§36 + §37)
+
+A 9 kg next-day parcel is ordered Friday 19:30. The cutoff is 6 PM and Saturday is a warehouse holiday.
+
+| Stage | Clock |
+|---|---|
+| Start | Friday 19:30 |
+| 1 Cutoff (19:30 > 18:00) | SET → Saturday 09:00 |
+| 2–5 Buffers | +0 → Saturday 09:00 |
+| 6 SLA (9 kg → next-day, 1 day) | ADD → Sunday 09:00 |
+| 7 Pickup day-skip (Saturday = holiday) | WALK → the delivery moves one day, to Monday |
+| 8 Delivery day-skip (Monday = working) | no change |
+| Final time of day | SET 22:00 → **Monday 10 PM** |
+
+### Be ready for a different count
+
+The code also has 3 steps that aren't buffers:
+
+- **Before stage 1:** a weight-slab match picks the delivery type and the SLA (§20).
+- **Applying the summed buffers** is its own step.
+- **At the end:** normalise the time of day (§34–35).
+
+So `projects/findings/PROMISE-ENGINE-HLD.md` §4.0 lists 10 rows in execution order. "8" counts only the configurable time adjustments. If an interviewer counts differently, say this.
+
+**Interview answer:**
+
+> "For every shipment, the delivery time runs through eight adjustments in a fixed order: cutoff, static buffers, rain, capacity, tags, SLA, then the pickup and delivery day-skips. The order matters. The cutoff sets the start. A hyperlocal cutoff replaces the SLA instead of adding to it. Rain only applies when there's no manual delay. And after a day-skip we re-anchor the time."
 
 <!-- ➕ added:end -->
 
