@@ -2,6 +2,12 @@ FIELD COLLECTIONS WORKFLOW — Salesman Collection & Cheque Recovery, Ripplr CDM
 
 "Everyone assumes rejection is a checkbox that flips back to 'pending.' On this system, who rejects it changes what you're even allowed to edit."
 
+➕ Detailed version:
+"Salesmen collect cash, cheques, UPI and NEFT against store invoices — about ₹105 crore a month — and a segregator and then a cashier verify every collection. Everyone assumes a rejection just flips it back to 'pending.' Here, who rejects it decides what can change: a segregator rejection reopens the whole submission, while a cashier rejection unlocks only the rejected payment, and its reason code decides whether the amount, the cheque details, either, or nothing can be edited — checked on the server, not just hidden in the app. And because one payment is spread across several invoices, a resubmit doesn't edit rows in place: it rebuilds the set, links each new row to the one it replaces, and carries forward anything the cashier already verified."
+
+➕ Business-context version:
+"Ripplr is an FMCG distributor in South India — it moves products from brands like Britannia to tens of thousands of small stores. In a distribution business, selling is only half the job; the other half is getting the money back, and that's the part I own: collections. Every working day about 550 salesmen collect cash, cheques, UPI and NEFT from around 16,500 stores — roughly ₹105 crore a month. That money passes through four roles before the company trusts it: the salesman collects it, the segregator checks it, the cashier verifies it, and the sales officer steps in when something goes wrong, like a bounced cheque."
+
 ================================================ Step 1 ================================================
 
 Your 90-second answer

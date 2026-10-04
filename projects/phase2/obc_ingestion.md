@@ -2,6 +2,12 @@ FINANCIAL INGESTION PIPELINE — OBC Adjustment, Ripplr CDMS
 
 "It looks like a file upload. It's actually fifteen thousand independent financial transactions wearing a spreadsheet as a disguise, and the money on the other end has often already been promised to a salesman standing in a store right now."
 
+➕ Detailed version:
+"Brands send credit notes and cash discounts as spreadsheets, each brand in its own format, so it looks like a file upload. It isn't. Every row is a financial write across four to seven tables — the adjustment itself, the invoice's outstanding balance, the salesman's collection assignment — and about 35,000 of those rows come through every day across all brands. So the row, not the file, is the unit of work: each row commits or rolls back in its own SQL transaction, and one bad row never blocks the rest. Three dedup layers — the file's S3 etag, duplicate flags inside the file, and a normalized hash per row checked against SQL — make sure a re-uploaded credit note can't take the same money off an invoice twice."
+
+➕ Business-context version:
+"An FMCG distributor works on behalf of brands, and those brands keep giving stores credit notes and cash discounts — money that has to come off what each store owes. At Ripplr, 14 brands send these as spreadsheets, each in its own format. If one is applied twice or missed, the store's balance is wrong and the salesman goes to collect the wrong amount. I built the pipeline that turns those files into about 35,000 adjustments a day, each applied to the right invoice exactly once."
+
 ================================================ Step 1 ================================================
 
 The 30-second skeleton

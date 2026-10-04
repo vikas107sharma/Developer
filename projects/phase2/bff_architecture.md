@@ -2,6 +2,12 @@ BFF ARCHITECTURE — MyDesignation Backend, Shopify
 
 "The website is a Shopify theme with no backend of its own — every extra feature you see is a third-party app bolted onto the page. A native app can't work that way, so I built the server the app actually needed."
 
+➕ Detailed version:
+"MyDesignation's website is a Shopify theme with no server behind it — reviews, size charts, bundles, loyalty and tracking are each a third-party app injected into the browser page, and a native app can't inject anything. So I built the backend-for-frontend the app was missing: eighteen modules, eighty-four endpoints, one Docker image that runs as an API and a queue worker. Shopify stays the system of record, and Postgres holds only what Shopify doesn't — sessions, OTPs, payment claims, tracking events. The real work wasn't CRUD: it was calling six third parties while staying inside Shopify's cost-based rate limit, and making sure Razorpay's webhook racing the app's own request can never create the same order twice."
+
+➕ Business-context version:
+"MyDesignation is a D2C brand that sells through Shopify — the store does around 48,700 orders a month. A website can run on Shopify plus plug-in apps, but a native mobile app can't; it needs its own server. I built that entire backend for the app — login, catalogue, cart, payments, reviews, loyalty and order tracking — one API that talks to Shopify and to services like Razorpay, Judge.me and ClickPost on the app's behalf."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

@@ -2,6 +2,12 @@ CACHING & IDENTITY — MyDesignation Backend, Shopify
 
 "A cache that lies is worse than no cache at all — and a login system where two humans can end up sharing one account is a support ticket waiting to happen. Both had to be provably safe, not just usually right."
 
+➕ Detailed version:
+"Both halves follow one rule: never trust a shortcut you can't verify. The cache sits in front of every Shopify read, but it's a speed-up, never a dependency — if Redis fails, the call goes straight to Shopify and returns real data late instead of nothing. I learned why the hard way: a transient failure got cached as a genuine 'no size chart' answer for almost an hour, so the shared cache helper now refuses to store a null, for every caller. Login is passwordless — phone OTP, email OTP, Google, Apple — and a verified phone or email belongs to exactly one account. That's a database unique constraint, not code that checks first and writes second, so two simultaneous logins can never both claim the same number."
+
+➕ Business-context version:
+"In D2C e-commerce, a slow page loses the sale and a painful login loses the sign-up. At MyDesignation I built both sides: a cache in front of Shopify so pages load fast without burning through Shopify's rate limit, and a passwordless login — phone OTP, email OTP, Google or Apple. The rule for both was the same: fast is only useful if it's correct. The cache never serves a failure as if it were real data, and one phone number or email can never end up attached to two people's accounts."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

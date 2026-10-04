@@ -2,6 +2,12 @@ CUSTOMER-FACING FAN-IN API — Post-Order Read Path, Supertails
 
 "Writing the order document was the easy half. The hard half was answering one screen's worth of questions when the truth about that order lives in twelve different systems that don't agree on vocabulary."
 
+➕ Detailed version:
+"Writing the order document was the easy half. Every screen a customer sees — order list, order details, shipment tracking, each in app and web, so six routes — needs answers from twelve-plus systems that don't share a vocabulary: Shopify, our Mongo shipment data, returns, revised delivery dates, pharmacy, failed deliveries, pricing. I built the fan-in layer that gathers all of it and turns it into one sentence like 'Arriving by Tomorrow 10 PM'. It makes one batched query per source for the whole page, never one per order, and if a source is down the response loses one field, not the page. The hard cases came from split orders: a return counted once even when Shopify lists the item in two fulfilments, and a cash-on-delivery amount split across shipments that still adds up exactly to the order total."
+
+➕ Business-context version:
+"After someone buys, the screen that matters is 'My Orders' — if it's confusing or wrong, they call support. At Supertails, the true answer to 'what's happening with my order?' was spread across twelve-plus systems: Shopify, shipments, returns and refunds, changed delivery dates, prescription checks, failed delivery attempts. I built the API behind that screen. It pulls everything together, turns it into one plain sentence like 'Arriving by Tomorrow 10 PM', and if one of those systems is down, the page still loads without it."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

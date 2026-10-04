@@ -2,6 +2,12 @@ NOTIFICATIONS & GST E-INVOICING — WhatsApp Delivery + ClearTax Compliance, Rip
 
 "The hard part was never sending the WhatsApp message. It was proving to a government portal that ₹500 minus tax equals exactly ₹500, to the paisa, every single time."
 
+➕ Detailed version:
+"Sending the WhatsApp message was never the hard part — deciding when it's safe to send, and getting the tax maths exact, was. The Kafka event only carries a salesman and a date; the consumer re-checks the database before sending, so a collection verified over several days gets one receipt, not a half-finished one or two copies — about 17,000 a day, one per invoice. When a bounced-cheque charge is recovered, I also issue a GST invoice through ClearTax, and the portal checks the taxable value, 9% CGST and 9% SGST separately, to the paisa. Dividing by 1.18 can miss by one paisa and get the invoice rejected, so I search up to fifteen rounding candidates for an exact match, locked down by a parametrized test suite."
+
+➕ Business-context version:
+"When a store pays a salesman, the store owner wants proof that the money was received and counted against the right bill. At Ripplr I built the system that sends that proof on WhatsApp — a receipt for every verified collection, about 17,000 a day, one per invoice. The same system handles the part the government cares about: when a store pays the charge for a bounced cheque, the company has to issue a proper GST invoice through ClearTax, and the tax has to match to the last paisa or the invoice is rejected."
+
 ================================================ Step 1 ================================================
 
 Your 90-second answer

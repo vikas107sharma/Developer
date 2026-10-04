@@ -2,6 +2,12 @@ EXACTLY-ONCE ORDER CREATION — MyDesignation Backend, Shopify
 
 "Two writers I don't control can both try to create the same order for the same payment, at the same instant — and if I lose that race, a customer gets charged once and billed twice."
 
+➕ Detailed version:
+"When a customer pays, two writers I don't control — the app's own verify call and Razorpay's webhook — can both try to create the Shopify order, in either order or at the same instant. If I lose that race, the customer is charged once and billed twice. So there's no distributed lock and no read-then-check: one Postgres row per checkout attempt, claimed with a single conditional UPDATE, and the number of rows it changed is the verdict — one means I create the order, zero means someone already did. Unique columns on the payment and order IDs catch anything that slips past, and cash-on-delivery, which has no payment ID at all, is guarded by a partial unique index that only applies while an attempt is still live."
+
+➕ Business-context version:
+"For any online store, the worst payment bug isn't a failed payment — it's taking the money once and creating the order twice, because then someone has to notice it, refund it and apologise. At MyDesignation, two things can try to create the order after a payment — the app itself and the payment gateway's webhook — and they can arrive at the same moment. I made sure exactly one order gets created every time, with the database itself as the referee, including cash-on-delivery orders, where there's no payment ID to check against."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

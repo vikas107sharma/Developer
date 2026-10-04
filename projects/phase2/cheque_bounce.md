@@ -2,6 +2,12 @@ CHEQUE BOUNCE MANAGEMENT — Ripplr CDMS
 
 "This isn't a workflow system. It's a custody and accountability system for money that has already been lost — the goods are already delivered, the cheque already bounced, and now the only question is who is responsible for that money at every second until it's recovered."
 
+➕ Detailed version:
+"By the time this system sees a cheque, the goods are delivered and the cheque has bounced — so it isn't a workflow tool, it's a custody system for money that's already missing. The cheque moves from Cashier to Segregator to Sales Officer, and each handoff starts a 30-minute accountability lock that blocks the person who handed it off, not the one sitting on it, because the assigner is the one with a reason to chase. Every balance change is recomputed under a row lock and logged to an append-only audit ledger, never patched with a delta. Across 4,527 cheques, every one of the 3,844 resolved so far recovered its full principal — not a rupee written off."
+
+➕ Business-context version:
+"In FMCG distribution, a big share of payments still comes in by cheque — at Ripplr, cheques were about 28% of the money collected in a month. When a cheque bounces, the store already has the goods and the company has lost the money, so getting it back is pure loss recovery. I own that recovery system: the bounced cheque goes from the cashier to the segregator to a sales officer who visits the store to collect again, and at every step the system knows exactly who is responsible for that money. Across 4,527 bounced cheques worth about ₹10.7 crore, every cheque we closed recovered its full principal."
+
 ================================================ Step 1 ================================================
 
 The 30-second skeleton

@@ -2,6 +2,12 @@ CENTRALIZED IAM & RBAC — DMS + CDMS Estates, Ripplr
 
 "It's not an auth microservice. It's a passthrough — nine login systems that had already drifted apart agree on one truth without a single one of them being rewritten."
 
+➕ Detailed version:
+"Ripplr had nine separate login systems across the DMS and CDMS estates, for about ten thousand employees — quietly sharing one hardcoded secret, with permissions checked three different ways. I couldn't rewrite them, because too many foreign keys depend on each estate's user IDs. So IAM sits only in the login path and issues each estate's existing token format, signed with that estate's own secret, and every verifier downstream accepts it without a line of code changing. Permissions stay out of the token — an admin's full list would be about 7.6 KB against nginx's 8 KB header limit — so the token carries group IDs in about 210 bytes, and each request is one Redis set-membership check. Taking access away means updating Redis, not waiting for a token to expire."
+
+➕ Business-context version:
+"Every company has to answer two questions for every employee: who are you, and what are you allowed to do? Ripplr has about ten thousand people — from salesmen in the field to admins in the office — working across two big internal platforms, DMS and CDMS, and they had nine different login systems answering those questions nine different ways. I built one central identity and permissions service that gives everyone one login and one source of truth for access, without rewriting any of the systems that already depended on the old logins."
+
 ================================================ Step 1 ================================================
 
 The 30-second skeleton

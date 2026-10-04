@@ -2,6 +2,12 @@ REALTIME INVENTORY SYNC — ERP → Promise Engine, Supertails
 
 "The bug I'm proudest of catching isn't a crash — it's a query that succeeded, logged nothing, and quietly told the delivery engine we were out of stock on items we actually had."
 
+➕ Detailed version:
+"The Promise Engine sets delivery dates from warehouse stock, and that stock used to arrive from the ERP only as a periodic snapshot. I added a realtime webhook — check the secret, publish to Pub/Sub, return 202 — and kept the snapshot running as the thing that guarantees correctness. The bug I'm proudest of was where the two paths met: both wrote through one function, but the snapshot lists every warehouse for every item, while the webhook lists only the warehouses that changed. So a single webhook batch could write a zero for an unrelated SKU in a warehouse nobody mentioned — no error, no log, the query succeeded — and we stopped promising delivery on stock we actually had. I added logging to prove it first, then made webhook writes skip any warehouse an item never mentioned."
+
+➕ Business-context version:
+"A delivery promise is only as good as the stock data behind it. If the system thinks an item is out of stock when it's actually on the shelf, we lose the sale; if it thinks stock is there when it isn't, we break a promise. At Supertails, stock came from the ERP only once every five minutes. I made it near-realtime — the ERP now pushes each change as it happens, about 3,000 to 7,000 a day — and kept the five-minute snapshot as a safety net that fixes anything a realtime update gets wrong."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

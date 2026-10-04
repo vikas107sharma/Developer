@@ -2,6 +2,12 @@ DELIVERY PROMISE ENGINE — EDD Computation Service, Supertails
 
 "Everyone assumes promising a delivery date is a lookup. It isn't — it's a constraint-satisfaction problem over inventory, geography, weight, cutoffs and calendars, run fresh on every cart, and if I get the ordering wrong the promise is just wrong, not broken."
 
+➕ Detailed version:
+"Everyone thinks a delivery date is a table lookup. It's a constraint problem, solved fresh for every cart. First I find warehouses that cover every SKU — searching by latitude/longitude, then pincode, then city, then state — with one allocation tracker across all four levels so the same stock is never promised twice. Then I pack the units into shipments, first-fit, under each warehouse's weight limit. Then every shipment goes through eight timing stages — cutoffs; static, rain, capacity and tag buffers; the SLA; and two day-skips — in a fixed order, because each stage changes what the next one means. The service covers 130 warehouses and darkstores and handles about 50,000 requests a day, and if I get that order wrong nothing crashes — the date is just quietly wrong."
+
+➕ Business-context version:
+"In e-commerce, the one promise a customer remembers is the delivery date — 'it'll reach you by tomorrow evening.' Promise too late and they don't buy; promise too early and you break their trust. Supertails is a pet-care e-commerce company, and I built the engine that makes that promise. For every cart, it decides which of our 130 warehouses and dark stores ships each item and the exact date and time it can reach the customer — about 50,000 requests a day, so it has to be correct and fast at the same time."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

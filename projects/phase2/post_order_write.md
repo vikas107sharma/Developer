@@ -2,6 +2,12 @@ POST-ORDER STATE MODELING — Order Lifecycle Write Path, Supertails
 
 "An order isn't one fact, it's a sequence of facts arriving from four different systems over days — and my job on the write side was making sure the document never lies about which fact is current."
 
+➕ Detailed version:
+"An order isn't one fact — it's a series of facts from four systems over several days: Shopify says what was bought, the Promise Engine says how we plan to ship it, the warehouse's delivery note says what was actually packed, and the courier says where the parcel is. I keep all of it in one Mongo document per order, with line items separate from shipments, and each shipment holding the plan and the tracking side by side. When the warehouse packs something different from the plan, I tombstone the old shipment instead of deleting it, so history survives and array positions never shift. Courier updates hit exactly one shipment through positional array filters. And when the Promise Engine silently dropped a SKU it couldn't plan, I added a placeholder shipment so an item the customer paid for can never vanish from their view."
+
+➕ Business-context version:
+"Once a customer pays, their next question is always 'where is my order?' At Supertails, answering that honestly means following the order through four systems — Shopify, our delivery-date engine, the warehouse and the courier — and each one reports at a different time over several days. I built the part that records all of it in one place, so what we planned, what was actually packed and where the parcel is right now always stay correct — even when the warehouse ships something different from the plan."
+
 ================================================ Step 1 ================================================
 
 The 60-second version

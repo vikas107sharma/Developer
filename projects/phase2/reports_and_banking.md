@@ -2,6 +2,12 @@ REPORTING & BANK RECONCILIATION — Report Platform + ICICI Integration, Ripplr 
 
 "Two halves of the same idea: one side turns messy operational data into a file someone can open, the other turns an encrypted bank payload into a row you can trust exactly once."
 
+➕ Detailed version:
+"Two halves of one idea: turning raw data into something you can trust. On the reporting side, nineteen report types run through one database-backed queue — around 375 reports a day — and the real decision is how each one is built: in memory, streamed to disk, fetched in chunks, or split into date windows. That matters because a row cap fails silently — when the outstanding ledger outgrew its 100,000-row cap, everything past that row was dropped and the file still looked complete. On the banking side, ICICI sends data two ways with two encryption schemes — an AES key wrapped in RSA for statement pulls, per-field RSA-4096 on the webhook — and it resends each webhook about every 30 minutes until acknowledged, so a four-column unique key turns every replay into a no-op instead of a double-counted transaction."
+
+➕ Business-context version:
+"A business that collects around ₹105 crore a month asks two questions every day: 'show me the numbers' and 'did that money actually reach our bank?' At Ripplr I own both. The reporting platform produces about 375 reports a day across 19 types — outstanding balances, bounced cheques, salesman collections, GPS and store-visit compliance — for a few hundred users a month. And the bank integrations bring every transaction in from the bank, so the money salesmen say they collected can be matched against what the bank actually received."
+
 This one splits into two acts — a batch report platform and a bank integration — because they're genuinely different problems that happen to share a resume line.
 
 ================================================ Step 1 ================================================
