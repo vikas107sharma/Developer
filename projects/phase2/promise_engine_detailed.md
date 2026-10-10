@@ -70,6 +70,7 @@
 - [63. The complete mental model](#63-the-complete-mental-model)
 - [64. The most important backend concepts hidden inside this design](#64-the-most-important-backend-concepts-hidden-inside-this-design)
 - [65. One final diagram to memorize](#65-one-final-diagram-to-memorize)
+- [66. The database — every table behind the promise](#66-the-database--every-table-behind-the-promise)
 
 <!-- ➕ added:end -->
 
@@ -3962,3 +3963,1156 @@ Capacity feedback
 ```
 
 If you understand why those decisions must happen in that order, you understand the architecture rather than just memorizing its rules.
+
+<!-- ➕ added:start -->
+
+## 66. The database — every table behind the promise
+
+**➕ Added — complete database diagram, and why each table exists**
+
+Everything lives in **MySQL**. There are two kinds of tables:
+
+- **Configuration tables.** The operations team manages these through the Control Tower: zones, warehouses, SLAs, cutoffs, buffers, capacity and rain. The engine reads them through its ORM models.
+- **Inventory and pincode tables.** These are older, hold data synced from the ERP, and are read with plain SQL in the `promiseEngine` schema.
+
+Redis sits in front of most reads as a 5-minute cache. It is a cache, not a store of record, so it's not in the diagram.
+
+### 66.1 The whole picture — how the tables connect
+
+Two tables are the hubs: **`clusters`** (delivery zones) and **`serving_entities`** (warehouses and darkstores). Almost everything else hangs off one of them.
+
+```text
+                                  ┌───────────────────────┐
+                                  │ polygon_h3_indexes    │
+                                  └──────────▲────────────┘
+                                             │ many cells per polygon
+  ┌───────────────────┐           ┌──────────┴────────────┐
+  │ cluster_pincodes  │           │ geo_polygons          │
+  │ cluster_cities    │           └──────────▲────────────┘
+  │ cluster_states    │                      │
+  └─────────┬─────────┘           ┌──────────┴────────────┐
+            │ many                │ cluster_polygons      │  (zone ⇄ polygon, many-to-many)
+            ▼                     └──────────┬────────────┘
+  ┌──────────────────────────────────────────▼──────────────┐
+  │                        clusters                         │   ← HUB 1: delivery zones
+  └──────┬───────────────────────────────────────────┬──────┘
+         │ many                                      │ many (cluster-scoped delays)
+         ▼                                           ▼
+  ┌───────────────────────────┐            ┌───────────────────────────┐
+  │ cluster_warehouse_matrix  │            │ static_buffers            │──< static_buffer_areas
+  │ (zone × warehouse ×       │            │                           │──< day_skip_buffer
+  │  weight → type + SLA)     │            └─────────────▲─────────────┘
+  └──────────────┬────────────┘                          │ many (warehouse-scoped delays)
+                 │ many                                  │
+                 ▼                                       │
+  ┌──────────────────────────────────────────────────────┴──┐
+  │                    serving_entities                     │   ← HUB 2: warehouses & darkstores
+  └──┬────────────┬────────────┬────────────────────────────┘
+     │ many       │ many       │ rain tables (66.5)
+     ▼            ▼            ▼
+  warehouse_   capacity_    rain_status · rain_buffer_matrix · rain_intensities_buffers
+  cutoffs      buffers      rain_hourly_intensity · rain_accuweather_locations
+                            rain_buffer_alerts · rain_buffer_approvals
+
+  ─── not linked by keys, joined by name or by value ───────────────────────────
+  EDDItemMaster ══ EdditemInventory      one column per warehouse, named after the warehouse
+  warehouse_mapping                      ERP warehouse name → that column name
+  cpinDataV2                             pincode → city, state (feeds the city/state levels)
+  tag_buffers                            matched against EDDItemMaster.tags by text
+```
+
+`──<` means "one to many". The dotted section at the bottom holds tables that aren't connected by foreign keys. They're matched by a name or a value instead.
+
+### 66.2 Serviceability — "where is the shopper, which zones?"
+
+```text
+ geo_polygons                     polygon_h3_indexes
+ ┌───────────────────────┐        ┌──────────────────────┐
+ │ id                    │◄──────┤ polygon_id            │
+ │ name                  │        │ h3_index (indexed)   │
+ │ geometry (polygon)    │        │ resolution (10)      │
+ │ boundary_type         │        └──────────────────────┘
+ │ status ACTIVE/…       │
+ └──────────▲────────────┘
+            │
+ cluster_polygons                 clusters
+ ┌───────────────────────┐        ┌──────────────────────┐
+ │ polygon_id            │        │ id                   │
+ │ cluster_id ───────────┼───────►│ name                 │
+ └───────────────────────┘        │ type: polygon /      │
+                                  │   pincode / city /   │
+ cluster_pincodes  (cluster_id, pincode)  ───►│   state              │
+ cluster_cities    (cluster_id, city_code)───►│ status (on/off)      │
+ cluster_states    (cluster_id, state_code)──►└──────────────────────┘
+
+ cpinDataV2:  cPin · city · state · stateFullName · required_sla_minutes · (feature flags)
+```
+
+| Table | Why it exists | Used at |
+|---|---|---|
+| `geo_polygons` | Stores each delivery polygon as a real map shape (WGS84). It is the source the hexagons are generated from. | Polygon save and re-index |
+| `polygon_h3_indexes` | One row per (polygon, H3 cell) at resolution 10. A request turns lat/lng into one cell and looks it up here. **This is what makes the location lookup a single indexed query instead of a geometry test.** | Every request that has a location |
+| `clusters` | A delivery zone. Its type is polygon, pincode, city or state. A zone is what links to warehouses. | Every level of the search |
+| `cluster_polygons` | Links polygons to polygon zones, many-to-many | Lat/lng level |
+| `cluster_pincodes` / `cluster_cities` / `cluster_states` | List which pincodes, cities or states make up a zone | Pincode, city and state levels |
+| `cpinDataV2` | Turns a pincode into a city and state, which feed the city and state levels. It also stores the pincode's "required SLA minutes", used for the quick-delivery flag. No pincode row means the request is rejected. | Start of every request |
+
+### 66.3 Sourcing and SLA — "which warehouse, which delivery type, how fast?"
+
+```text
+ serving_entities                         cluster_warehouse_matrix
+ ┌──────────────────────────┐             ┌──────────────────────────────────┐
+ │ id                       │◄────────────┤ warehouse_id                     │
+ │ name  (= stock column)   │             │ cluster_id ──────► clusters      │
+ │ type: warehouse/darkstore│             │ min_weight · max_weight (kg)     │
+ │ location (point)         │             │ delivery_type (10 values)        │
+ │ max_shipment_weight (g)  │             │ sla_value · sla_unit (min/hr/day)│
+ │ capacity                 │             │ priority                         │
+ │ status active/inactive/  │             │ UNIQUE (cluster, warehouse,      │
+ │        maintenance       │             │         min_weight, max_weight)  │
+ └──────────────────────────┘             └──────────────────────────────────┘
+```
+
+| Table | Why it exists | Used at |
+|---|---|---|
+| `serving_entities` | The warehouses and darkstores. Its **name** is also the column name in the stock table. Its **parcel weight limit** drives packing. Only active ones are considered. | Search, packing |
+| `cluster_warehouse_matrix` | **The heart of the configuration.** For each zone and warehouse pair, it gives the **priority** used to rank warehouses in the search. It also gives each **weight slab's delivery type and SLA**. The unique key stops the same slab being defined twice for a pair (it does not catch two slabs whose ranges overlap). | Warehouse ranking (Lesson 2), weight lookup (Rule 1) |
+
+### 66.4 Delivery-time rules — "cutoffs, delays, capacity, tags, non-working days"
+
+```text
+ serving_entities ──< warehouse_cutoffs
+                      warehouse_id · delivery_type
+                      start_time · end_time        (hyperlocal window)
+                      cutoff_time                  (other types)
+                      days_to_add · time           (where the clock is SET)
+                      is_active
+
+ serving_entities ──< capacity_buffers
+                      warehouse_id · delivery_type
+                      time_frame_start · time_frame_end   (one row = one slot)
+                      capacity · buffer_value · buffer_unit
+                      order_count · spill · breach_time   (live counters)
+                      UNIQUE (warehouse, delivery_type, slot)
+
+ clusters / serving_entities ──< static_buffers
+                      buffer_scope: cluster_warehouse / warehouse / cluster
+                      buffer_nature: time_addition / day_skip
+                      cluster_id · warehouse_id
+                      min_weight · max_weight · area_selection
+                      buffer_value · buffer_unit · start_datetime · end_datetime
+                         │
+                         ├──< static_buffer_areas   area_type (polygon/pincode/city/state) · area_value
+                         └──< day_skip_buffer       pickup_skip · delivery_skip          (weekdays)
+                                                    pickup_date_skip · delivery_date_skip (dates)
+
+ tag_buffers           tag · buffer_value (can be negative) · buffer_unit · active window
+```
+
+| Table | Why it exists | Pipeline step |
+|---|---|---|
+| `warehouse_cutoffs` | When a warehouse stops taking work for a delivery type: an operating window for hyperlocal, a daily cutoff for the rest. It also says **where to SET the clock** when the cutoff is missed (days to add, reset time). | Rule 2 (cutoff), and the day-skip re-anchor |
+| `static_buffers` | The supply-chain team's planned delays, scoped to a zone, a warehouse or a pair. They can be limited by weight, area and date range. There are two natures: **time additions** and **non-working days**. | Rule 3 (delays) and the day-skip walks |
+| `static_buffer_areas` | Restricts a delay to specific polygons, pincodes, cities or states | Rule 3 |
+| `day_skip_buffer` | The non-pickup and non-delivery weekdays and dates belonging to a day-skip delay, one value per row | The two calendar walks |
+| `capacity_buffers` | **The only table the promise flow writes to.** Each row is one time slot for one warehouse and delivery type, holding a capacity and live counters. When orders plus carried-over spill reach capacity, the slot's delay is added. | Rule 3 (capacity), and the order-count feedback loop (Lesson 5) |
+| `tag_buffers` | Extra time (or less time) for products carrying a given tag. They're matched by text against the item master's tags. | Rule 3 (tags) |
+
+### 66.5 Rain — "watch the weather, decide, approve, apply"
+
+```text
+ serving_entities ──1 rain_accuweather_locations   accuweather_location_key       (which forecast point)
+                  ──1 rain_buffer_matrix           pre_rain_lead_minutes ·
+                  │                                post_rain_cooldown_minutes · is_active
+                  │        └──< rain_intensities_buffers   rain_intensity_label · duration ·
+                  │                                       buffer_value   (the lookup table)
+                  ──< rain_hourly_intensity        hour_start_at · precipitation intensity
+                  ──1 rain_status                  is_raining · intensity · spell start/end ·
+                  │                                buffer_active · buffer_value_minutes ·
+                  │                                manual_override · last_checked_at
+                  │        └──► rain_buffer_approvals (active approval)
+                  ──< rain_buffer_alerts           activated / deactivated / updated events
+
+ rain_buffer_approval_batches ──< rain_buffer_approvals ──► serving_entities
+   (one batch per city, Telegram message, expiry)   (suggested vs applied minutes, who responded)
+
+ rain_buffer_approval_settings   approval on/off · timeout minutes · timeout action ·
+                                 active hours · outside-hours action
+```
+
+| Table | Why it exists |
+|---|---|
+| `rain_accuweather_locations` | Maps a warehouse to its weather-service location key, so the poll knows where to ask |
+| `rain_buffer_matrix` | Turns rain buffering on for a warehouse, and sets how early to start before rain and how long to keep the delay after it stops. Only warehouses with an active row are polled. |
+| `rain_intensities_buffers` | The lookup table: intensity label × how long it has rained → delay minutes |
+| `rain_hourly_intensity` | The hourly intensity forecast per warehouse. The frequent poll reads the previous hour's value to know *how hard* it's raining. |
+| `rain_status` | **The one rain table the promise engine reads on every request.** It holds the current decision per warehouse: is it raining, is a delay active, and how many minutes. |
+| `rain_buffer_approval_batches` / `rain_buffer_approvals` | The human-approval workflow. Each batch is one Telegram message per city, and each approval row records one warehouse's suggested and applied delay and who responded. |
+| `rain_buffer_approval_settings` | The knobs: whether approval is needed, the timeout (default 10 min, then auto-approve), and the active hours |
+| `rain_buffer_alerts` | An audit trail of rain delays being switched on, changed or off |
+
+### 66.6 Inventory — "who has the stock?" (ERP-synced, plain SQL)
+
+```text
+ EDDItemMaster                          EdditemInventory
+ ┌──────────────────────────────┐       ┌───────────────────────────────────────────┐
+ │ skuId          ══════════════╪══════►│ skuCode                                   │
+ │ weight (kg)                  │ inner │ WH_A  WH_B  DKS_C  …  (one column per     │
+ │ Type: SIMPLE / BUNDLE        │ join  │                        warehouse, holding │
+ │ componentSkusData (bundles)  │       │                        its quantity)      │
+ │ status                       │       └───────────────────────────────────────────┘
+ │ tags   ──► matched by tag_buffers   ▲
+ └──────────────────────────────┘                     │ column chosen via
+                                        warehouse_mapping (erpWarehouseName → ucWarehouseName)
+```
+
+| Table | Why it exists | Who writes it |
+|---|---|---|
+| `EDDItemMaster` | Per SKU: **weight** (for SLA slabs and parcel packing), simple or bundle, bundle components, and **tags** (for tag delays). The engine **inner-joins** it to stock, so a SKU with no master row is invisible and shows as out of stock. | ERP full snapshots, and the bundle sync job. Realtime stock deltas never touch it. |
+| `EdditemInventory` | Stock per SKU. It's a **wide table**: one column per warehouse. One read returns a SKU's stock everywhere, but every new warehouse needs a new column. | ERP realtime webhook (only the warehouses in the message), full snapshots, and the bundle job (bundle stock = the scarcest component's complete bundles) |
+| `warehouse_mapping` | Translates the ERP's warehouse names into the names used as stock columns and on the warehouse records. Ingestion reads it through a one-hour Redis cache. The warehouse-pinned promise also reads it. | Only read in this codebase |
+
+### 66.7 Admin and protection (not part of the promise math)
+
+| Table | Why it exists |
+|---|---|
+| `rate_limit_endpoints` | Which API endpoints are rate-limited. The live limiter keeps its token buckets in Redis; this table only says which endpoints are enrolled. |
+| `rate_limit_tracking` | Per-IP counters. Only the admin cache screens use it; the live limiter doesn't. |
+| `control_panel_users` | Who can use the Control Tower admin console, and their role |
+| `audit_logs` | A record of admin operations made through the Control Tower |
+
+### 66.8 How one cart request walks the tables
+
+```text
+ cpinDataV2 ─► (polygon_h3_indexes ─► geo_polygons ─► cluster_polygons)
+           ─► cluster_pincodes / cluster_cities / cluster_states ─► clusters
+           ─► cluster_warehouse_matrix + serving_entities          (ranked warehouses)
+           ─► EDDItemMaster ⋈ EdditemInventory                     (stock per warehouse)
+           ─► cluster_warehouse_matrix                             (weight → type + SLA)
+           ─► warehouse_cutoffs · static_buffers (+ areas, day skips)
+              · capacity_buffers · tag_buffers · rain_status        (delivery-time rules)
+           ─► promise
+ order placed ─► capacity_buffers  (order_count + 1, spill → next slot)   ← the only write
+```
+
+### 66.9 How values get into each table (inserts and updates)
+
+Rows arrive through six different paths. Knowing which path owns a table tells you how fresh it is and who to blame when it's wrong.
+
+```text
+  ① Admin console (Control Tower API) ── one row at a time: create · edit · delete
+  ② Bulk upload (CSV / KML files)      ── many new rows at once, inside one transaction
+  ③ Derived automatically              ── regenerated whenever its source row changes
+  ④ ERP data sync                      ── upserts from webhooks and scheduled snapshots
+  ⑤ Live order flow                    ── counters bumped when an order is counted
+  ⑥ Weather jobs                       ── rain decisions written on every poll
+```
+
+**Configuration tables (written by people)**
+
+| Table | Inserted by | Updated by | How |
+|---|---|---|---|
+| `clusters` | ① | ① | Single-row create and edit |
+| `cluster_pincodes` / `cluster_cities` / `cluster_states` / `cluster_polygons` | ① when a zone is built or edited | ① (add or remove members) | One row per pincode, city, state or polygon in the zone |
+| `geo_polygons` | ① (a drawn GeoJSON shape) or ② (CSV / KML; multi-part shapes are merged into one) | ① | Saving a polygon also regenerates its H3 cells (③) |
+| `serving_entities` | ① | ① | Single-row create and edit |
+| `cluster_warehouse_matrix` | ① or ② | ① | Each row is one weight slab for a zone–warehouse pair |
+| `warehouse_cutoffs` | ① or ② | ① | Hyperlocal rows must have a window; other rows must have a cutoff time |
+| `static_buffers` | ① or ② | ① | Created together with its areas and day-skip rows |
+| `static_buffer_areas` | With its buffer (① or ②) | ① **replaces** the list: delete old rows, insert new ones | |
+| `day_skip_buffer` | With its buffer (① or ②) | ① (rows added or removed) | One weekday or date per row |
+| `capacity_buffers` | ① or ② (**one row per future time slot**, created in advance) | ① for settings; ⑤ for the live counters | No job resets counters; a new slot is simply a new row starting at zero |
+| `tag_buffers` | ① or ② | ① | Tags are trimmed and upper-cased on save |
+| `rain_buffer_matrix` | ① | ① | Turns rain buffering on for a warehouse |
+| `rain_intensities_buffers` | ① with its matrix | ① **replaces** the lookup rows: delete, then insert | |
+| `rain_buffer_approval_settings` | Created with defaults when none exist | ① | A single settings row |
+| `rain_accuweather_locations` | An admin-triggered sync that finds the weather location key for each hyperlocal warehouse | The same sync | |
+| `control_panel_users` | ① | ① | |
+
+**Derived, synced and live tables (written by the system)**
+
+| Table | Inserted by | Updated by | How |
+|---|---|---|---|
+| `polygon_h3_indexes` | ③ on polygon save, plus a full re-index endpoint | Never edited in place | **Delete all of that polygon's cells, then re-insert** them in batches. There is no transaction, so a lookup during a rebuild can briefly miss the polygon. |
+| `EDDItemMaster` | ④ ERP full snapshots, the bundle sync job, and an item-status job | The same jobs | Upsert (insert, or update if the SKU exists). **Realtime webhook deltas never write here**, so a brand-new SKU waits for a snapshot. |
+| `EdditemInventory` | ④ ERP realtime webhook (through Pub/Sub), full snapshots, and the bundle job | The same | Upsert **one warehouse column at a time**. Webhook deltas touch only the warehouses in the message. Snapshots write every warehouse, including zeros. The bundle job writes each bundle's buildable count. |
+| `capacity_buffers` (counters) | — | ⑤ when the order-complete flow asks for a counted promise | One **atomic** `order_count + 1`, with a breach time stamped once. The overflow is then written to the next slot's `spill` (a separate read-then-write). |
+| `rain_status` | ⑥ created the first time a warehouse is polled | ⑥ every poll; approvals and auto-approvals | Holds the current decision: raining?, buffer active?, minutes |
+| `rain_hourly_intensity` | ⑥ hourly job | ⑥ | **Upsert by (warehouse, hour)** |
+| `rain_buffer_approval_batches` / `rain_buffer_approvals` | ⑥ when a delay needs approval (one batch per city) | Approve link, or the timeout job (default: auto-approve after 10 min) | Approving also writes the delay into `rain_status` |
+| `rain_buffer_alerts` | ⑥ on each switch-on, change or switch-off | Never | Append-only history |
+| `audit_logs` | Every admin request, through middleware | Never | Append-only |
+
+**Tables this service only reads**
+
+| Table | Note |
+|---|---|
+| `cpinDataV2` | Pincode → city, state and required SLA minutes. Nothing in this codebase writes it. |
+| `warehouse_mapping` | ERP warehouse name → engine warehouse name. Nothing in this codebase writes it. |
+| `rate_limit_endpoints` | Which endpoints are rate-limited. There's no create path in the code, so rows are added outside the application. |
+
+**One consequence to remember:** no admin write clears the promise engine's cache. A change made in the Control Tower, such as a new cutoff, buffer or SLA row, starts affecting promises when the cached copy expires, which is within about 5 minutes by default.
+
+**Things to remember about the database:**
+
+1. **Two hubs.** `clusters` (zones) and `serving_entities` (warehouses) hold almost everything else together.
+2. **The SLA matrix is the centre of the configuration.** It ranks warehouses and turns weight into a delivery type and SLA.
+3. **H3 cells are pre-computed into a table**, so a location lookup is a single indexed query.
+4. **Stock is a wide table**, one column per warehouse. Reads are fast, but every new warehouse means a schema change.
+5. **Only `capacity_buffers` is written by the promise flow**, and only when an order is counted. Everything else is configuration or synced data.
+6. **Six write paths:** admin edits, bulk uploads, derived H3 cells, ERP sync, order counting and weather jobs. Admin changes reach promises only after the ~5-minute cache expires.
+
+<!-- ➕ added:end -->
+
+
+
+<!-- ➕ DB schema:start -->
+
+// Promise Engine — complete MySQL schema
+// Paste this whole file into https://dbdiagram.io/d
+//
+// Sources: the 29 Control Tower ORM models and the warehouse_mapping model (columns, types,
+// defaults, unique keys), plus the plain SQL for EDDItemMaster and EdditemInventory (no model).
+// Single-column helper indexes are left out; every unique / composite key is kept.
+//
+// Line colours:
+//   default (dark)  = foreign key or ORM association declared in code
+//   grey  #9E9E9E   = no key; the code matches these columns by value
+
+Project promise_engine {
+  database_type: 'MySQL'
+  Note: '''
+  Two hubs hold the configuration together: clusters (delivery zones) and serving_entities (warehouses and darkstores).
+  Configuration tables are written by people through the Control Tower. Stock tables are written by ERP sync jobs.
+  The promise flow itself writes only capacity_buffers counters. Redis caches reads for about 5 minutes and is not shown.
+  '''
+}
+
+// ─────────────────────────────────────────── Enums
+
+Enum cluster_type {
+  "polygon"
+  "pincode"
+  "city"
+  "state"
+}
+
+Enum delivery_type {
+  "hyperlocal"
+  "hyperlocal B"
+  "SDD A"
+  "SDD B"
+  "SDD C"
+  "NDD A"
+  "NDD B"
+  "NDD C"
+  "Standard A"
+  "Standard B"
+}
+
+Enum buffer_unit {
+  "minutes"
+  "hours"
+  "days"
+}
+
+Enum rain_label_forecast {
+  "light"
+  "moderate"
+  "heavy"
+}
+
+Enum rain_label_status {
+  "none"
+  "light"
+  "moderate"
+  "heavy"
+  "extreme"
+}
+
+Enum timeout_action {
+  "auto_approve"
+  "auto_reject"
+}
+
+// ─────────────────────────────────────────── 1. Serviceability — "where is the shopper, which zones?"
+
+Table geo_polygons [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  name varchar(255) [not null, unique]
+  description text
+  geometry geometry [not null, note: 'POLYGON, SRID 4326 (WGS84)']
+  boundary_type varchar [not null, default: 'CUSTOM', note: 'CUSTOM / PINCODE / CITY / STATE']
+  status varchar [not null, default: 'ACTIVE', note: 'ACTIVE / INACTIVE / DRAFT']
+  metadata json
+  created_by varchar(100) [not null]
+  updated_by varchar(100)
+  created_at datetime
+  updated_at datetime
+
+  Note: '''
+  WHY: each delivery polygon stored as a real map shape. It is the source the H3 cells are generated from.
+  WRITTEN BY: admin console (drawn GeoJSON) or bulk upload (CSV / KML; multi-part shapes merged into one).
+  Saving a polygon regenerates its rows in polygon_h3_indexes.
+  '''
+}
+
+Table polygon_h3_indexes [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  polygon_id bigint [not null]
+  h3_index varchar(20) [not null, note: 'indexed — the lookup column']
+  resolution int [not null, note: '0–15; the engine uses 10']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    h3_index
+    (polygon_id, h3_index) [unique, name: 'unique_polygon_h3_index']
+  }
+
+  Note: '''
+  WHY: one row per (polygon, H3 cell). A request turns lat/lng into one cell and looks it up here,
+  so finding the shopper's polygon is one indexed query, not a geometry test.
+  WRITTEN BY: derived on polygon save, plus a full re-index endpoint.
+  HOW: delete all of that polygon's cells, then re-insert in batches (no transaction).
+  '''
+}
+
+Table clusters [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  name varchar(255) [not null, unique]
+  type cluster_type [not null]
+  status boolean [not null, default: true, note: 'zone on / off']
+  description varchar(1000)
+  metadata json
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  HUB 1 — a delivery zone. Its type says which member table defines it (polygons, pincodes, cities or states).
+  A zone is what gets linked to warehouses in cluster_warehouse_matrix.
+  WRITTEN BY: admin console, one row at a time.
+  '''
+}
+
+Table cluster_polygons [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  cluster_id bigint [not null]
+  polygon_id bigint [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (cluster_id, polygon_id) [unique, name: 'unique_cluster_polygon']
+  }
+
+  Note: '''
+  WHY: links polygons to polygon-type zones (many-to-many). Used at the lat/lng search level.
+  WRITTEN BY: admin console when a zone is built or edited.
+  '''
+}
+
+Table cluster_pincodes [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  cluster_id bigint [not null]
+  pincode varchar(10) [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (cluster_id, pincode) [unique, name: 'unique_cluster_pincode']
+  }
+
+  Note: '''
+  WHY: the pincodes that make up a pincode-type zone. Used at the pincode search level.
+  WRITTEN BY: admin console (add / remove members) or bulk upload.
+  '''
+}
+
+Table cluster_cities [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  cluster_id bigint [not null]
+  city_code varchar(50) [not null, note: 'matched against cpinDataV2.city']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (cluster_id, city_code) [unique, name: 'unique_cluster_city']
+  }
+
+  Note: '''
+  WHY: the cities that make up a city-type zone. Used at the city search level.
+  WRITTEN BY: admin console or bulk upload.
+  '''
+}
+
+Table cluster_states [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  cluster_id bigint [not null]
+  state_code varchar(50) [not null, note: 'matched against cpinDataV2.state']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (cluster_id, state_code) [unique, name: 'unique_cluster_state']
+  }
+
+  Note: '''
+  WHY: the states that make up a state-type zone. Used at the state search level (the last fallback).
+  WRITTEN BY: admin console or bulk upload.
+  '''
+}
+
+Table cpinDataV2 [headercolor: #1E88E5] {
+  id bigint [pk, increment]
+  cPin int [not null, unique]
+  city varchar(45)
+  state varchar(45)
+  stateFullName varchar(45)
+  required_sla_minutes int [note: 'not declared in the model; read by the engine for the quick-delivery flag']
+  is_ucj boolean [default: false]
+  is_ucj_web boolean [default: false]
+  is_ucj_web_gift_applicable boolean [default: false]
+  is_ucj_gift_applicable boolean [default: false]
+  is_serviceable_for_healthcare boolean [default: false]
+
+  Note: '''
+  WHY: turns a pincode into a city and state, which feed the city and state search levels.
+  No row for the pincode means the request is rejected.
+  WRITTEN BY: nothing in this codebase — read only.
+  '''
+}
+
+// ─────────────────────────────────────────── 2. Sourcing and SLA — "which warehouse, which type, how fast?"
+
+Table serving_entities [headercolor: #8E24AA] {
+  id bigint [pk, increment]
+  name varchar(255) [not null, note: 'also the column name for this warehouse in EdditemInventory']
+  type varchar [not null, note: 'warehouse / darkstore']
+  location geometry [not null, note: 'POINT, SRID 4326']
+  address varchar(500)
+  contact_person varchar(100)
+  contact_phone varchar(20)
+  contact_email varchar(100)
+  capacity int
+  max_shipment_weight int [not null, default: 1000, note: 'grams — parcel weight limit used by packing']
+  status varchar [not null, default: 'active', note: 'active / inactive / maintenance; only active is considered']
+  metadata json
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  HUB 2 — the warehouses and darkstores.
+  WHY: its name is the stock column; its max_shipment_weight drives parcel packing.
+  WRITTEN BY: admin console, one row at a time.
+  '''
+}
+
+Table cluster_warehouse_matrix [headercolor: #8E24AA] {
+  id bigint [pk, increment]
+  cluster_id bigint [not null]
+  warehouse_id bigint [not null]
+  min_weight float [not null, note: 'kg']
+  max_weight float [not null, note: 'kg; must be > min_weight']
+  delivery_type delivery_type [not null]
+  sla_value int [not null]
+  sla_unit varchar [not null, note: 'min / hour / day']
+  priority int [not null, note: '>= 1; ranks warehouses for a zone']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (cluster_id, priority)
+    (cluster_id, warehouse_id) [name: 'idx_cluster_warehouse_lookup']
+    (cluster_id, warehouse_id, min_weight, max_weight) [unique, name: 'unique_cluster_warehouse_weight']
+  }
+
+  Note: '''
+  THE HEART OF THE CONFIGURATION. For each zone + warehouse pair:
+  - priority ranks the warehouses in the search;
+  - each weight slab gives the delivery type and SLA.
+  The unique key stops an identical slab twice; it does not catch overlapping ranges.
+  WRITTEN BY: admin console or bulk upload.
+  '''
+}
+
+// ─────────────────────────────────────────── 3. Delivery-time rules — cutoffs, delays, capacity, tags, day skips
+
+Table warehouse_cutoffs [headercolor: #FB8C00] {
+  id bigint [pk, increment]
+  warehouse_id bigint [not null]
+  delivery_type delivery_type [not null]
+  start_time time [note: 'hyperlocal window start (required for hyperlocal types)']
+  end_time time [note: 'hyperlocal window end (required for hyperlocal types)']
+  cutoff_time time [note: 'daily cutoff (required for non-hyperlocal types)']
+  days_to_add int [not null, default: 0, note: 'after cutoff: days to move forward']
+  time time [note: 'after cutoff: the time the clock is SET to']
+  is_active boolean [not null, default: true]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (warehouse_id, delivery_type, is_active)
+  }
+
+  Note: '''
+  WHY: when a warehouse stops taking work for a delivery type, and where to SET the clock when that cutoff is missed.
+  Pipeline: Rule 2 (cutoff) and the day-skip re-anchor.
+  WRITTEN BY: admin console or bulk upload.
+  '''
+}
+
+Table static_buffers [headercolor: #FB8C00] {
+  id bigint [pk, increment]
+  cluster_id bigint [note: 'required for cluster and cluster_warehouse scope']
+  warehouse_id bigint [note: 'required for warehouse and cluster_warehouse scope']
+  buffer_scope varchar [not null, note: 'cluster_warehouse / warehouse / cluster']
+  buffer_nature varchar [not null, note: 'time_addition / day_skip']
+  min_weight decimal(10,3) [note: 'kg']
+  max_weight decimal(10,3) [note: 'kg']
+  area_selection varchar [not null, default: 'all_areas', note: 'all_areas / specific_areas']
+  buffer_unit buffer_unit [not null, default: 'days']
+  buffer_value int [not null, default: 0, note: '0–365']
+  start_datetime datetime [not null]
+  end_datetime datetime [not null]
+  is_active boolean [not null, default: true]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (warehouse_id, buffer_scope)
+    (cluster_id, buffer_scope)
+    (warehouse_id, is_active)
+    (cluster_id, is_active)
+    (min_weight, max_weight)
+  }
+
+  Note: '''
+  WHY: the supply-chain team planned delays, scoped to a zone, a warehouse or a pair,
+  optionally limited by weight, area and date range. Two natures: time additions and non-working days.
+  Pipeline: Rule 3 (delays) and the two day-skip walks.
+  WRITTEN BY: admin console or bulk upload, together with its areas and day-skip rows.
+  '''
+}
+
+Table static_buffer_areas [headercolor: #FB8C00] {
+  id bigint [pk, increment]
+  static_buffer_id bigint [not null]
+  area_type cluster_type [not null]
+  area_value varchar(255) [not null, note: 'polygon id, pincode, city or state, depending on area_type']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (area_type, area_value)
+    (static_buffer_id, area_type, area_value) [unique]
+  }
+
+  Note: '''
+  WHY: restricts a static buffer to specific polygons, pincodes, cities or states.
+  WRITTEN BY: with its buffer. An edit REPLACES the list: delete old rows, insert new ones.
+  '''
+}
+
+Table day_skip_buffer [headercolor: #FB8C00] {
+  id bigint [pk, increment]
+  static_buffer_id bigint [not null]
+  pickup_skip varchar(10) [note: 'a weekday with no pickup']
+  delivery_skip varchar(10) [note: 'a weekday with no delivery']
+  pickup_date_skip date [note: 'a specific date with no pickup']
+  delivery_date_skip date [note: 'a specific date with no delivery']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  WHY: the non-pickup and non-delivery weekdays and dates of a day_skip static buffer, one value per row.
+  Pipeline: the pickup-day walk and the delivery-day walk.
+  WRITTEN BY: with its buffer (admin console or bulk upload).
+  '''
+}
+
+Table capacity_buffers [headercolor: #FB8C00] {
+  id bigint [pk, increment]
+  warehouse_id bigint [not null]
+  delivery_type delivery_type [not null]
+  time_frame_start datetime [not null, note: 'one row = one time slot']
+  time_frame_end datetime [not null]
+  capacity int [not null, note: '>= 1; max orders in the slot']
+  buffer_unit buffer_unit [not null, default: 'days']
+  buffer_value int [not null, default: 0, note: 'delay added once the slot is breached']
+  is_active boolean [not null, default: true]
+  order_count bigint [not null, default: 0, note: 'LIVE counter: atomic +1 per counted order']
+  spill bigint [not null, default: 0, note: 'LIVE: overflow carried in from the previous slot']
+  breach_time datetime [note: 'stamped once, when the slot first breaches']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (warehouse_id, delivery_type, time_frame_start, time_frame_end) [unique, name: 'unique_warehouse_delivery_timeframe']
+    (warehouse_id, is_active)
+    (delivery_type, is_active)
+  }
+
+  Note: '''
+  WHY: per-slot order capacity. Breached when order_count + spill >= capacity; then buffer_value is added.
+  THE ONLY TABLE THE PROMISE FLOW WRITES.
+  WRITTEN BY: admin console or bulk upload create the slots in advance (no job resets counters;
+  a new slot is a new row starting at zero). The order-complete flow bumps order_count and writes spill to the next slot.
+  '''
+}
+
+Table tag_buffers [headercolor: #FB8C00] {
+  id bigint [pk, increment]
+  tag varchar(255) [not null, note: 'trimmed and upper-cased on save']
+  buffer_unit buffer_unit [not null, default: 'minutes']
+  buffer_value int [not null, note: 'can be negative (less time); cannot be zero']
+  description text
+  is_active boolean [not null, default: true]
+  start_date_time datetime
+  end_date_time datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (tag, is_active)
+    (start_date_time, end_date_time)
+  }
+
+  Note: '''
+  WHY: extra (or less) time for products carrying a tag. Matched by text against EDDItemMaster.tags.
+  Pipeline: Rule 3 (tags).
+  WRITTEN BY: admin console or bulk upload.
+  '''
+}
+
+// ─────────────────────────────────────────── 4. Rain — watch the weather, decide, approve, apply
+
+Table rain_accuweather_locations [headercolor: #00897B] {
+  warehouse_id bigint [pk]
+  accuweather_location_key varchar(32) [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  WHY: maps a warehouse to its weather-service location key, so the poll knows where to ask.
+  WRITTEN BY: an admin-triggered sync over hyperlocal warehouses.
+  '''
+}
+
+Table rain_buffer_matrix [headercolor: #00897B] {
+  id bigint [pk, increment]
+  warehouse_id bigint [not null]
+  pre_rain_lead_minutes int [not null, default: 15]
+  post_rain_cooldown_minutes int [not null, default: 20]
+  is_active boolean [not null, default: true]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (warehouse_id, is_active)
+  }
+
+  Note: '''
+  WHY: turns rain buffering on for a warehouse; sets how early to start before rain and how long to hold after it stops.
+  Only warehouses with an active row are polled.
+  WRITTEN BY: admin console.
+  '''
+}
+
+Table rain_intensities_buffers [headercolor: #00897B] {
+  warehouse_id bigint [not null]
+  rain_intensity_label rain_label_forecast [not null]
+  duration int [not null, note: 'duration bucket, minutes']
+  buffer_value int [not null, default: 0, note: 'delay minutes to add']
+
+  indexes {
+    (warehouse_id, rain_intensity_label, duration) [pk]
+  }
+
+  Note: '''
+  WHY: the lookup table — intensity label x how long it has rained -> delay minutes.
+  WRITTEN BY: admin console with its matrix. An edit REPLACES the rows: delete, then insert.
+  '''
+}
+
+Table rain_hourly_intensity [headercolor: #00897B] {
+  id bigint [pk, increment]
+  warehouse_id bigint [not null]
+  hour_start_at datetime [not null]
+  has_precipitation boolean [not null, default: false]
+  precipitation_type varchar(32)
+  precipitation_intensity rain_label_forecast
+  raw json
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (warehouse_id, hour_start_at) [unique]
+    hour_start_at
+  }
+
+  Note: '''
+  WHY: hourly forecast per warehouse. The frequent poll reads the previous hour to know HOW HARD it is raining.
+  WRITTEN BY: hourly weather job — upsert by (warehouse, hour).
+  '''
+}
+
+Table rain_status [headercolor: #00897B] {
+  id bigint [pk, increment]
+  warehouse_id bigint [not null, unique]
+  location_name varchar(255)
+  lat double [not null]
+  lng double [not null]
+  is_raining boolean [not null, default: false]
+  rain_intensity double [note: 'mm/hour']
+  rain_intensity_label rain_label_status [not null, default: 'none']
+  rain_started_at datetime
+  rain_ended_at datetime
+  rain_duration_minutes int
+  rain_summary varchar(500)
+  rain_expected_at datetime
+  rain_expected_end_at datetime
+  buffer_active boolean [not null, default: false]
+  buffer_value_minutes int [not null, default: 0, note: 'the delay the promise engine adds']
+  buffer_activated_at datetime
+  last_digest_sent_at datetime
+  manual_override boolean [not null, default: false]
+  approved_cooldown_minutes int [note: 'overrides the matrix cooldown while this buffer is live']
+  active_approval_id bigint
+  last_checked_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    buffer_active
+  }
+
+  Note: '''
+  WHY: THE ONE RAIN TABLE THE PROMISE ENGINE READS ON EVERY REQUEST.
+  The current decision per warehouse: raining? delay active? how many minutes?
+  WRITTEN BY: weather jobs (created on the first poll, updated every poll), approvals and auto-approvals.
+  '''
+}
+
+Table rain_buffer_approval_batches [headercolor: #00897B] {
+  id varchar(64) [pk]
+  city varchar(128) [not null]
+  status varchar [not null, default: 'pending', note: 'pending / partially_actioned / completed / expired']
+  warehouse_count int [not null, default: 0]
+  pending_count int [not null, default: 0]
+  timeout_action timeout_action [not null, default: 'auto_approve']
+  timeout_minutes int [not null, default: 10]
+  telegram_message_id varchar(64)
+  expires_at datetime [not null]
+  completed_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (status, expires_at)
+  }
+
+  Note: '''
+  WHY: one approval request per city — one Telegram message — with an expiry.
+  WRITTEN BY: weather job when a delay needs approval; closed by the approve link or the timeout job.
+  '''
+}
+
+Table rain_buffer_approvals [headercolor: #00897B] {
+  id bigint [pk, increment]
+  batch_id varchar(64) [not null]
+  warehouse_id bigint [not null]
+  warehouse_name varchar(255)
+  city varchar(128) [not null]
+  intensity_label varchar(32) [not null]
+  intensity_mm_hr double
+  rain_duration_minutes int
+  rain_summary varchar(500)
+  buffer_value_suggested int [not null]
+  cooldown_suggested int [not null]
+  buffer_value_applied int
+  cooldown_applied int
+  status varchar [not null, default: 'pending', note: 'pending / approved / rejected / expired / cancelled']
+  responded_by varchar(255)
+  responded_at datetime
+  response_source varchar [note: 'web_approval / auto_timeout / auto_outside_hours / rain_stopped']
+  re_eligible_at datetime
+  cancellation_reason varchar(64)
+  buffer_applied_at datetime
+  buffer_removed_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (warehouse_id, status)
+    (status, re_eligible_at)
+  }
+
+  Note: '''
+  WHY: one warehouse's suggested vs applied delay inside a batch, and who responded.
+  WRITTEN BY: weather job; updated by the approve link or the timeout job (default: auto-approve after 10 min).
+  Approving also writes the delay into rain_status.
+  '''
+}
+
+Table rain_buffer_approval_settings [headercolor: #00897B] {
+  id bigint [pk, increment]
+  approval_enabled boolean [not null, default: true]
+  approval_timeout_minutes int [not null, default: 10]
+  timeout_action timeout_action [not null, default: 'auto_approve']
+  rejection_cooldown_minutes int [not null, default: 30]
+  active_hours_start varchar(5) [not null, default: '06:00']
+  active_hours_end varchar(5) [not null, default: '23:00']
+  outside_hours_action timeout_action [not null, default: 'auto_approve']
+  escalation_needs_approval boolean [not null, default: true]
+  page_poll_interval_seconds int [not null, default: 10]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  WHY: the knobs of the approval workflow. A single settings row.
+  WRITTEN BY: created with defaults when missing; edited through the admin console.
+  '''
+}
+
+Table rain_buffer_alerts [headercolor: #00897B] {
+  id bigint [pk, increment]
+  warehouse_id bigint [not null]
+  location_name varchar(255)
+  event_type varchar [not null, note: 'activated / deactivated / buffer_updated / digest']
+  buffer_minutes_before int [not null, default: 0]
+  buffer_minutes_after int [not null, default: 0]
+  decision_case tinyint
+  rain_summary varchar(500)
+  rain_intensity double
+  rain_intensity_label rain_label_status
+  email_sent boolean [not null, default: false]
+  email_error text
+  metadata json
+  created_at datetime [not null]
+
+  indexes {
+    (warehouse_id, created_at)
+    (event_type, created_at)
+  }
+
+  Note: '''
+  WHY: audit trail of rain delays being switched on, changed or off.
+  WRITTEN BY: weather jobs. Append-only, never updated.
+  '''
+}
+
+// ─────────────────────────────────────────── 5. Inventory — "who has the stock?" (ERP-synced, plain SQL)
+
+Table EDDItemMaster [headercolor: #43A047] {
+  skuId varchar [unique, note: 'upsert key (ON DUPLICATE KEY)']
+  weight decimal [note: 'kg (ERP grams / 1000); drives SLA slabs and parcel packing']
+  Type varchar [note: 'SIMPLE / BUNDLE']
+  componentSkusData json [note: 'bundle components; for SIMPLE, the SKU itself']
+  status int [note: '1 = active, 2 = inactive']
+  tags varchar [note: 'comma-separated; read by the engine, written by no job in this codebase']
+
+  Note: '''
+  WHY: per-SKU weight, simple vs bundle, bundle components and tags.
+  The engine INNER-JOINS it to EdditemInventory, so a SKU with no master row is invisible (shows out of stock).
+  WRITTEN BY: ERP full snapshots, the bundle sync job and an item-status job — all upserts.
+  Realtime webhook deltas never write here.
+  No ORM model: column types are not declared in this codebase; names come from the SQL.
+  '''
+}
+
+Table EdditemInventory [headercolor: #43A047] {
+  skuCode varchar [unique, note: 'upsert key (ON DUPLICATE KEY)']
+  "<warehouse name>" int [note: 'ONE COLUMN PER WAREHOUSE, named exactly as serving_entities.name; holds the quantity']
+
+  Note: '''
+  WHY: stock per SKU, as a WIDE table — one read returns a SKU stock in every warehouse;
+  every new warehouse needs a new column.
+  WRITTEN BY: ERP realtime webhook via Pub/Sub (only the warehouses in the message), full snapshots
+  (every warehouse, including zeros) and the bundle job (buildable bundle count).
+  HOW: upsert one warehouse column at a time.
+  No ORM model: column types are not declared in this codebase.
+  '''
+}
+
+Table warehouse_mapping [headercolor: #43A047] {
+  id int [pk, increment]
+  ucWarehouseName varchar(255) [not null, note: 'engine name = stock column = serving_entities.name']
+  erpWarehouseName varchar(255) [not null, note: 'name the ERP sends']
+  createdAt datetime
+  updatedAt datetime
+
+  Note: '''
+  WHY: translates ERP warehouse names into the engine names (stock columns, warehouse records).
+  Several ERP names can map to the same engine name.
+  Read by ingestion (through a one-hour Redis cache) and by the warehouse-pinned promise.
+  WRITTEN BY: nothing in this codebase — read only.
+  '''
+}
+
+// ─────────────────────────────────────────── 6. Admin and protection (not part of the promise math)
+
+Table rate_limit_endpoints [headercolor: #757575] {
+  id bigint [pk, increment]
+  endpoint varchar(500) [not null, unique]
+  method varchar [not null, default: 'ALL', note: 'GET / POST / PUT / PATCH / DELETE / ALL']
+  is_active boolean [not null, default: true]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (endpoint, method) [unique, name: 'unique_endpoint_method']
+  }
+
+  Note: '''
+  WHY: which API endpoints are rate-limited. The live limiter keeps its token buckets in Redis.
+  WRITTEN BY: no create path in the code — rows are added outside the application.
+  '''
+}
+
+Table rate_limit_tracking [headercolor: #757575] {
+  id bigint [pk, increment]
+  ip_address varchar(45) [not null]
+  endpoint_id bigint [not null]
+  method varchar(10) [not null]
+  remaining_count int [not null, default: 100]
+  last_request_at datetime [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (ip_address, endpoint_id, method) [unique, name: 'unique_ip_endpoint_method']
+  }
+
+  Note: '''
+  WHY: per-IP counters. Used only by the admin cache screens; the live limiter does not use it.
+  '''
+}
+
+Table control_panel_users [headercolor: #757575] {
+  id "bigint unsigned" [pk, increment]
+  email varchar(255) [not null, unique]
+  role varchar(50) [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  WHY: who can use the Control Tower admin console, and their role.
+  WRITTEN BY: admin console.
+  '''
+}
+
+Table audit_logs [headercolor: #757575] {
+  id bigint [pk, increment]
+  user varchar(255) [not null, default: '']
+  operation varchar(255) [not null, default: '']
+  request varchar(500) [not null, default: '', note: 'e.g. POST /clusters']
+  req_body json
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  Note: '''
+  WHY: a record of admin operations made through the Control Tower.
+  WRITTEN BY: middleware on every admin request. Append-only.
+  '''
+}
+
+// ─────────────────────────────────────────── Groups (coloured boxes on the canvas)
+
+TableGroup serviceability [color: #1E88E5] {
+  geo_polygons
+  polygon_h3_indexes
+  clusters
+  cluster_polygons
+  cluster_pincodes
+  cluster_cities
+  cluster_states
+  cpinDataV2
+}
+
+TableGroup sourcing_and_sla [color: #8E24AA] {
+  serving_entities
+  cluster_warehouse_matrix
+}
+
+TableGroup delivery_time_rules [color: #FB8C00] {
+  warehouse_cutoffs
+  static_buffers
+  static_buffer_areas
+  day_skip_buffer
+  capacity_buffers
+  tag_buffers
+}
+
+TableGroup rain [color: #00897B] {
+  rain_accuweather_locations
+  rain_buffer_matrix
+  rain_intensities_buffers
+  rain_hourly_intensity
+  rain_status
+  rain_buffer_approval_batches
+  rain_buffer_approvals
+  rain_buffer_approval_settings
+  rain_buffer_alerts
+}
+
+TableGroup inventory_erp [color: #43A047] {
+  EDDItemMaster
+  EdditemInventory
+  warehouse_mapping
+}
+
+TableGroup admin [color: #757575] {
+  rate_limit_endpoints
+  rate_limit_tracking
+  control_panel_users
+  audit_logs
+}
+
+// ─────────────────────────────────────────── Relationships declared in code (FK or ORM association)
+
+// serviceability
+Ref: polygon_h3_indexes.polygon_id > geo_polygons.id [delete: cascade]
+Ref: cluster_polygons.polygon_id > geo_polygons.id [delete: cascade]
+Ref: cluster_polygons.cluster_id > clusters.id [delete: cascade]
+Ref: cluster_pincodes.cluster_id > clusters.id [delete: cascade]
+Ref: cluster_cities.cluster_id > clusters.id [delete: cascade]
+Ref: cluster_states.cluster_id > clusters.id [delete: cascade]
+
+// sourcing and SLA
+Ref: cluster_warehouse_matrix.cluster_id > clusters.id [delete: cascade]
+Ref: cluster_warehouse_matrix.warehouse_id > serving_entities.id [delete: cascade]
+
+// delivery-time rules
+Ref: warehouse_cutoffs.warehouse_id > serving_entities.id [delete: cascade]
+Ref: static_buffers.cluster_id > clusters.id [delete: cascade]
+Ref: static_buffers.warehouse_id > serving_entities.id [delete: cascade]
+Ref: static_buffer_areas.static_buffer_id > static_buffers.id [delete: cascade]
+Ref: day_skip_buffer.static_buffer_id > static_buffers.id // ORM association only (no FK declared)
+Ref: capacity_buffers.warehouse_id > serving_entities.id [delete: cascade]
+
+// rain
+Ref: rain_accuweather_locations.warehouse_id - serving_entities.id
+Ref: rain_buffer_matrix.warehouse_id > serving_entities.id
+Ref: rain_intensities_buffers.warehouse_id > serving_entities.id
+Ref: rain_intensities_buffers.warehouse_id > rain_buffer_matrix.warehouse_id // ORM association (matrix has many lookup rows)
+Ref: rain_hourly_intensity.warehouse_id > serving_entities.id
+Ref: rain_status.warehouse_id - serving_entities.id
+Ref: rain_status.active_approval_id > rain_buffer_approvals.id // ORM association only
+Ref: rain_buffer_alerts.warehouse_id > serving_entities.id
+Ref: rain_buffer_approvals.batch_id > rain_buffer_approval_batches.id
+Ref: rain_buffer_approvals.warehouse_id > serving_entities.id
+
+// admin
+Ref: rate_limit_tracking.endpoint_id > rate_limit_endpoints.id
+
+// ─────────────────────────────────────────── Matched by value in code (no key) — grey lines
+
+Ref: EdditemInventory.skuCode - EDDItemMaster.skuId [color: #9E9E9E] // INNER JOIN in the promise query
+Ref: warehouse_mapping.ucWarehouseName > serving_entities.name [color: #9E9E9E]
+Ref: cluster_cities.city_code <> cpinDataV2.city [color: #9E9E9E]
+Ref: cluster_states.state_code <> cpinDataV2.state [color: #9E9E9E]
+Ref: tag_buffers.tag <> EDDItemMaster.tags [color: #9E9E9E] // text match against the comma-separated tags
+
+
+<!-- ➕ DB schema:end -->
