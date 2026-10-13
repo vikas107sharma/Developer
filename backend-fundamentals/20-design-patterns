@@ -1,0 +1,88 @@
+OutBox pattern 
+
+At high level it solves one problem that shows in every backend 
+How do you change your database and also tell other services without loosing the message or sending the false one
+
+2 SYSTEMS
+
+.- - - - - ONE TRANSACTION - - - - -.
+|                                   |
+|  +----------+   +--------------+  |    :    +--------------+       +-----------+
+|  | DATABASE |   |    ORDER     |  |    :    |    BROKER    | ==>   |   EMAIL   |
+|  |          |<=>|   SERVICE    |  | .. : .. |              |       +-----------+
+|  | order 7  |   |              |  |    :    | OrderPlaced  | ==>   | SHIPPING  |
+|  +----------+   +--------------+  |    :    +--------------+       +-----------+
+|                                   |    :                           | INVENTORY |
+'- - - - - - - - - - - - - - - - - -' Network                        +-----------+
+                                     Boundary
+
+
+Problem: 
+You cannot update database and send to the broaker in one single step 
+You are really doing two separate writes one after another, There is gap between them and in that gap, anything can happen, the machine can crash, the network drop the broaker can be down for a second, so what happen after the first write and second has never land.
+
+What about 2 phase commit? 
+A database and a broaker cannot do it together, even if it does, it is slow.
+ 
+FIX:
+OutBox pattern is standard fix for that 
+Instead of writing at two places, write twice in same database 
+ex. Order: order 7 
+    outbox: orderPlaced
+
+OutBox is simply a table in the database 
+
++-----------------------------+
+| outbox                      |
+|-----------------------------|
+| * event id *                |
+| * aggregate: order          |
+| * aggregate_id: 7           |         THE RELAY
+| * type: OrderPlaced         |      - - - - - - - - >   +--------+
+| * payload: {...}            |      Runs in background  | broker |
+| * seq: 1                    |                          +--------+
++-----------------------------+
+
+How to build Relay
+1. Polling 
+2. Read the database change log (WAL) with Debezium
+
+
+
+UNIQUE ID GENERATOR
+
+Everytime something gets created, a message, a payment, an order it needs an id. 
+Handling IDs gets hard when many machines are creating messges at the same time. 
+
+Four requirements of IDs
+1. unique
+2. sorted by time 
+3. fits in 64 bits (BIGINT)
+4. gaps are fine (1001 -> 1005 -> 1008)
+
+Method 1:
+Ticket server (Flikkers): a table with single row, everytime someone needs an id, it adds 1 and return the id.
+
+Every request has a round trip with ticket server which adds latency 
+Single point of failure 
+            (runs two 
+                - one server only odd numbers, 
+                - other only even
+             But this is not sorted (lets say first message gtes 2 and next gets 1)
+            )
+
+
+Method 2:
+
+UUID: You have to pick 1 billions of messages per second for 86 years for change of collission 50%.
+
+It is 128 bits and completely random (not satisfying point 2 and 3)
+
+
+Method 3:
+Twitter's Snowflake:
+Time + machine code + counter
+First bit is always 0 so that number never goes negative 
+41 bits goes to time it will take 69 years to exhaust
+10 bits goes to machine code 
+12 bits goes to the counter (It means, if one machine needs more than 2^12 (40896) ids in a sec, it has to wait)
