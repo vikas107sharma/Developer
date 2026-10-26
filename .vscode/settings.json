@@ -1,0 +1,20 @@
+{
+    "code-runner.executorMap": {
+        "go": "\"C:\\Users\\vikas\\go-sdk\\go\\bin\\go.exe\" run"
+    },
+    "go.goroot": "C:\\Users\\vikas\\go-sdk\\go",
+    "go.alternateTools": {
+        "go": "C:\\Users\\vikas\\go-sdk\\go\\bin\\go.exe"
+    },
+    "terminal.integrated.env.windows": {
+        "PATH": "C:\\Users\\vikas\\go-sdk\\go\\bin;${env:PATH}"
+    },
+    "editor.inlineSuggest.enabled": false,
+    "github.copilot.editor.enableAutoCompletions": false,
+    "editor.quickSuggestions": {
+        "other": "off",
+        "comments": "off",
+        "strings": "off"
+    },
+    "editor.suggestOnTriggerCharacters": false
+}

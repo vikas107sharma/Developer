@@ -45,6 +45,31 @@ Docker Compose — tool to manage multi-container apps.
 
 ━━━━━━━━━━━━━━━ 📊 Containers vs Virtual Machines ━━━━━━━━━━━━━━━
 
+To build virtul machine you wil start with the hardware on the top of it you will need hupervisor, on the top of it you have the virtual machines such windows, linux, unix, on the top of it you have the applications.
+
+VMs consumes a lot of disk space, because each VM will have its own operating system, It also use lot of RAM and CPU power. Since it have entire Operating system it takes time to boot up It also requires licence for each operating system which requires more money.
+
+While VMM simulates entire machines, containers only contains an application that has been bundled with files configurations and dependencies.
+
+To build container you wil start with the hardware on the top of it you will need operating system, on the top of it you have the container engine. here the containers shares the underlying operating system
+
+VIRTUAL MACHINES                         CONTAINERS
++--------------------------+             +--------------------------+
+|       APPLICATION        |             | APPLICATION WINDOWS      |
++--------------------------+             +--------------------------+
+|  VM 1   | VM 2  | VM 3   |             |                          |
+| (LINUX) |(WIN)  |(UNIX)  |             |     CONTAINER ENGINE     |
++---------+-------+--------+             +--------------------------+
+|        HYPERVISOR        |             |     OPERATING SYSTEM (Linux)|  It can be windows also
++--------------------------+             +--------------------------+
+|    SERVER / HARDWARE     |             |    SERVER / HARDWARE     |
++--------------------------+             +--------------------------+
+     VIRTUAL MACHINES                             CONTAINERS
+
+
+Container must be packed to run on same operating system 
+If ther server OS crashes then all the containers will go down
+
 | Docker (Containers)     | Virtual Machines            |
 | ----------------------- | --------------------------- |
 | Lightweight             | Heavy (full OS inside)      |

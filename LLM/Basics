@@ -1,0 +1,702 @@
+LLM Interview Preparation for Backend Engineers
+
+1. Start with the big picture
+An LLM (Large Language Model) is a model trained to predict tokens. By repeatedly predicting the next token, it can generate text, answer questions, summarize documents, and write code.
+
+A typical application looks like this:
+User asks a question
+"What is our refund policy?"
+
+Backend application
+Authentication, prompt construction, retrieval
+
+LLM API
+Processes input tokens and generates output tokens
+
+Generated response
+A natural-language answer returned to the user
+
+Three things to keep separate from the beginning:
+- The model generates responses based on what it learned during training and the input it receives.
+- The backend application handles authentication, databases, business logic, API calls, and error handling.
+- RAG and other supporting components provide external information to the model when needed.
+
+An LLM application is not just a model. It is a software system built around one.
+
+
+2. Tokens — the units of text processing
+Simple definition
+A token is a piece of text that a model processes. It can be a complete word, part of a word, punctuation, or another text fragment.
+For example, a tokenizer might split:
+"Payment failed!"
+into tokens resembling:
+["Payment", " failed", "!"]
+The exact split depends on the tokenizer.
+How it works
+Text is converted into tokens, and each token is assigned an integer called a token ID.
+Text
+  ↓
+Tokenizer
+  ↓
+Tokens: ["Payment", " failed", "!"]
+  ↓
+Token IDs: [example IDs]
+  ↓
+Model input
+
+
+The displayed IDs above are illustrative; actual IDs depend on the model's vocabulary and tokenizer.
+Tokens matter because model APIs typically measure input and output usage in tokens. Token count affects context-window usage and usually affects inference cost. More tokens can also increase processing time, although the relationship depends on the model and serving system.
+Practical backend example
+Suppose your customer support application sends a 20-page support history to an LLM for every request.
+That may increase:
+- Input-token charges.
+- Processing latency.
+- Context-window pressure.
+- The amount of irrelevant information the model must consider.
+A better design may retrieve only the relevant support history or summarize older messages.
+Interview answer
+Tokens are the units of text that an LLM processes. A tokenizer splits text into tokens and maps them to integer IDs, which the model uses as input. Tokens can represent whole words, word fragments, or punctuation. Token counts matter because they affect context-window usage, processing requirements, and typically API costs.
+
+Common misconception
+Wrong: One word equals one token.
+Correct: Tokenization depends on the vocabulary and tokenizer. A word can become multiple tokens, and a token can contain a fragment of a word or multiple characters.
+
+3. Embeddings — representing meaning as numbers
+Simple definition
+An embedding is a list of numbers representing an item, such as a sentence or document chunk, in a numerical space where certain relationships can be measured.
+For example:
+"How do I reset my password?"
+             ↓
+        Embedding model
+             ↓
+    [0.12, -0.45, 0.78, ...]
+
+
+That list is called a vector: an ordered collection of numbers.
+How it works
+An embedding model converts text into a vector with a fixed number of dimensions for that model.
+Texts with similar meanings often have vectors that are close together according to a similarity measure, such as cosine similarity.
+For example:
+- "How can I reset my password?"
+- "I forgot my password. How do I change it?"
+These sentences use different words but express similar intent. A suitable embedding model may place their vectors close together.
+Practical backend example
+Your company has thousands of internal documents. A user asks:
+"How many days do I have to return a product?"
+An embedding model can represent the question and document chunks as vectors. The application can then find chunks about the return period even if the document uses different wording, such as "eligible for a refund within 30 days."
+Interview answer
+An embedding is a numerical vector representation of text or another data item. It allows us to compare items based on relationships captured by an embedding model. In a document-search system, we convert questions and document chunks into embeddings so that we can retrieve semantically similar content, even when the exact words differ.
+
+Common misconception
+Wrong: An embedding is the same as the original text converted into a numeric format.
+Correct: An embedding is a learned representation, not a reversible encoding of the complete sentence. It captures useful relationships but does not guarantee that every detail of the original text is preserved.
+Tokens vs. embeddings
+Tokens	Embeddings
+Pieces of text represented by token IDs	Numerical vector representations
+Used to encode text for the model	Used to represent relationships and meaning
+Often associated with a vocabulary	Produced by an embedding model or a model's embedding layer
+Example: token ID 1234	Example: [0.12, -0.45, 0.78, ...]
+A useful distinction: token IDs are discrete identifiers. Embeddings are numerical vectors.
+Also, the embeddings used by an LLM internally are not necessarily the same as the embeddings produced by a separate model used for document search.
+
+4. Vector databases — finding similar content efficiently
+Simple definition
+A vector database stores vectors and supports searching for vectors that are similar to a query vector. It can also store metadata, such as document IDs, access categories, and source URLs.
+Examples include Pinecone and Qdrant.
+How it works
+A simplified workflow:
+Document chunk → Embedding → Store vector
+                                   ↓
+User question → Embedding → Similarity search
+                                   ↓
+                          Top matching chunks
+
+
+The database compares the query vector with stored vectors using a similarity measure.
+For large datasets, vector databases commonly use approximate nearest-neighbor (ANN) search. ANN algorithms trade a small amount of retrieval accuracy for much faster searches across large collections.
+Practical backend example
+Your company has 100,000 document chunks.
+Without an efficient search structure, comparing a question vector against every stored vector may become expensive. A vector database can use specialized indexes to find likely matches quickly.
+You may also filter results using metadata:
+Search: "expense reimbursement policy"
+Filter: department = Finance
+Return: top 5 matching chunks
+
+
+Authorization filters are especially important. A semantically relevant document must not be returned to a user who lacks permission to access it.
+Interview answer
+A vector database stores embeddings and supports similarity-based retrieval. In an LLM application, we embed a user query, search for similar document vectors, and retrieve the associated text. Vector databases can also support metadata filtering and specialized indexes that make retrieval efficient at scale. They are often used as the retrieval layer in RAG systems.
+
+Common misconception
+Wrong: A vector database understands documents and generates answers.
+Correct: It retrieves relevant data. The LLM generally generates the natural-language answer.
+A vector database is not always necessary: for small datasets, an in-memory index or a relational database with suitable vector-search support may be sufficient.
+
+5. RAG — Retrieval-Augmented Generation
+Simple definition
+RAG is a technique in which an application retrieves relevant external information and supplies it to an LLM before asking it to generate a response.
+It combines two operations:
+- Retrieval: Find relevant information.
+- Generation: Use the LLM to produce an answer.
+How it works
+Consider an internal company-document chatbot.
+1. Prepare documents
+Extract text → split into chunks → generate embeddings
+
+2. Store document chunks and vectors
+Vector database + metadata
+
+
+3. Receive a user question
+Embed the question and retrieve relevant chunks
+
+4. Build the prompt
+Instructions + question + retrieved context
+
+5. Generate the answer
+LLM response, ideally with source citations
+
+
+There are two separate workflows:
+Indexing time — prepare documents and store their searchable representations.
+Query time — retrieve the relevant information and send it to the LLM.
+You normally do not regenerate embeddings for every document on every user request. Documents are indexed ahead of time and updated when they change.
+Practical backend example
+A user asks:
+"What is the reimbursement limit for business travel?"
+The LLM may not know your company's internal policy. Your backend retrieves the relevant policy chunk and sends something like:
+System instruction:
+Answer using the provided company documents.
+If the answer is unavailable, say so.
+
+Context:
+The business travel reimbursement limit is ₹5,000 per day.
+
+Question:
+What is the reimbursement limit for business travel?
+
+
+The model can now answer using the supplied policy.
+Interview answer
+RAG stands for Retrieval-Augmented Generation. It retrieves relevant information from an external knowledge source and includes that information in the LLM's prompt before generation. A typical implementation chunks documents, generates embeddings, stores them in a vector database, retrieves relevant chunks for a query, and passes those chunks to the LLM. RAG is useful for internal knowledge, frequently changing information, and source-grounded responses without retraining the model for every document update.
+
+Common misconception
+Wrong: RAG guarantees that the answer is correct because it uses company documents.
+Correct: RAG improves access to relevant information, but retrieval can fail, the documents can be outdated, and the LLM can still misinterpret the context or generate unsupported claims.
+Production considerations include document freshness, access control, retrieval quality, source citations, and what happens when no relevant context is found.
+
+6. Transformers — the architecture behind modern LLMs
+Simple definition
+A Transformer is a neural network architecture designed to process sequences of tokens and learn relationships between them.
+A neural network is a computational model with learned numerical values that transforms input data into predictions.
+Transformers are the foundation of most modern LLMs.
+How it works
+At a simplified level:
+1. Text is converted into token IDs.
+2. Token IDs are mapped to vectors.
+3. Transformer layers process those vectors using attention and other neural-network operations.
+4. The model produces scores for possible next tokens.
+5. A decoding process selects a token, and generation continues.
+Token IDs
+    ↓
+Token embeddings + position information
+    ↓
+Transformer layer
+  ├── Self-attention
+  └── Feed-forward network
+    ↓
+More Transformer layers
+    ↓
+Scores for next token
+
+
+Position information helps the model distinguish the order of tokens. For example, "dog bites person" and "person bites dog" contain similar words but have different meanings.
+The diagram is simplified: actual model architectures contain additional details, such as normalization and residual connections, which you do not need to explain first in a backend interview.
+Practical backend example
+A customer asks:
+"Why was my order delayed?"
+A Transformer-based LLM processes the supplied tokens and uses their relationships to generate a coherent response. If your application provides tracking information as context, the model can use it while generating the answer.
+The Transformer itself does not automatically query your orders database. Your application must retrieve that data and provide it to the model, unless an explicit tool-calling workflow is implemented.
+Interview answer
+A Transformer is a neural network architecture that processes token representations using mechanisms such as self-attention and feed-forward layers. Attention allows tokens to incorporate information from relevant parts of the input. Stacked Transformer layers learn increasingly useful representations, enabling modern LLMs to predict and generate text. Transformers are the core architecture behind many current language models.
+
+Common misconception
+Wrong: A Transformer is just an attention mechanism.
+Correct: Attention is one important component inside a Transformer architecture. A Transformer also includes other operations and multiple layers.
+
+7. Attention — deciding which context matters
+Simple definition
+Attention allows a model to weigh information from different tokens when processing a particular token.
+For example:
+"The customer returned the laptop because it was defective."
+
+When interpreting "it," the model can use information about the laptop and the surrounding sentence.
+How it works
+In self-attention, tokens produce three representations:
+- Query (Q): What information is this token looking for?
+- Key (K): What information does another token offer for matching?
+- Value (V): What information can be taken from that token?
+The model compares queries with keys to calculate attention weights, then uses those weights to combine value representations.
+You do not need to derive the attention equation for most backend interviews.
+Token representations
+        ↓
+   Query / Key / Value
+        ↓
+Compare queries with keys
+        ↓
+Calculate attention weights
+        ↓
+Combine values
+        ↓
+Context-aware representations
+
+
+For a decoder-only LLM generating text, causal attention also prevents a position from using future tokens that have not yet been generated.
+Practical backend example
+Imagine the input is:
+"The payment service called the order service because it needed the order status."
+Attention helps the model use the surrounding context when interpreting relationships between "payment service," "order service," and "it."
+It does not guarantee correct reasoning. It is a mechanism for computing context-dependent representations.
+Interview answer
+Self-attention lets each token representation incorporate information from other relevant tokens in the sequence. It uses queries, keys, and values to calculate weights that determine how information is combined. This helps a Transformer model relationships between words and their context. In autoregressive LLMs, causal masking prevents the model from attending to future tokens during next-token generation.
+
+Common misconception
+Wrong: Attention is a database lookup or a search across company documents.
+Correct: Self-attention operates on token representations within the model's input sequence. Searching external documents is a separate retrieval operation, commonly used in RAG.
+Transformers vs. attention
+Transformer	Attention
+Complete neural network architecture	One component of that architecture
+Includes attention and other operations	Computes context-dependent combinations of information
+Processes sequences through stacked layers	Helps those layers use relationships between tokens
+
+8. Context window — how much input the model can handle at once
+Simple definition
+The context window is the maximum amount of tokenized context a model can handle for a request or generation sequence, according to that model's limits.
+Depending on the model and API, the relevant token budget may include:
+- System instructions.
+- User messages.
+- Conversation history.
+- Retrieved RAG documents.
+- Tool outputs.
+- Generated output.
+Always check the specific model's documentation for its limits and accounting rules.
+How it works
+Suppose a model has a context limit of 32,000 tokens.
+Your request contains:
+Component	Tokens
+Instructions	1,000
+Conversation history	5,000
+Retrieved documents	15,000
+Current question	1,000
+Input total	22,000
+That leaves approximately 10,000 tokens for output only if the applicable API limit is a combined input-and-output budget and no other constraints apply.
+The exact calculation varies by model and API.
+Practical backend example
+Your RAG application retrieves 50 large document chunks for every query.
+This can create several problems:
+- The prompt may exceed the model's context limit.
+- Input costs and latency may increase.
+- Irrelevant information may distract from the important material.
+- Output space may be reduced when input and output share a token budget.
+A better retrieval strategy selects a small set of relevant chunks and manages the total token budget.
+Interview answer
+A context window is the amount of tokenized information a model can handle in a request or generation sequence. It can include instructions, conversation history, the user query, and retrieved context, with output counting against the limit where the model or API specifies a shared budget. Context limits matter when designing long conversations and RAG systems because they affect how much information we can supply and how much output we can generate.
+
+Common misconception
+Wrong: A larger context window means the model remembers every past conversation forever.
+Correct: The context window is a processing limit, not permanent memory. If your backend does not send previous conversation information again, the model generally cannot use that history in a subsequent stateless request.
+Context window vs. model memory
+- Context window: Information available to the model in the current processing context.
+- Application memory: Information your software persists, such as chat history in MySQL or Redis.
+- Model parameters: Information encoded in the learned numerical values of the model.
+These are three different things.
+
+9. Model parameters — the learned values inside the model
+Simple definition
+Parameters are learned numerical values inside a neural network that determine how it transforms input into output.
+You can think of them as the model's learned internal configuration, but unlike ordinary configuration settings, they are generally adjusted through training.
+How it works
+During training, the model makes predictions, compares them with a training objective, and adjusts its parameters to improve performance.
+A simplified view:
+Training examples
+       ↓
+Model makes predictions
+       ↓
+Calculate training error
+       ↓
+Adjust parameters
+       ↓
+Repeat many times
+       ↓
+Trained model
+
+
+A model with billions of parameters has billions of learned numerical values. Parameter count alone does not determine how good the model is; architecture, training data, training method, and evaluation also matter.
+Practical backend example
+Think of a model as a prebuilt software dependency, except its internal behavior is learned from data rather than written entirely as explicit rules.
+Your backend calls the model through an API. You generally do not change its parameters when a user submits a request.
+Training or fine-tuning changes the learned values. Inference uses the resulting model to generate predictions.
+Interview answer
+Model parameters are learned numerical values that determine how a neural network processes inputs and makes predictions. Training adjusts these values to reduce a loss function, which measures how well the model performs against its training objective. Parameters are different from training data: the data provides examples, while the parameters are the learned values resulting from training.
+
+Common misconception
+Wrong: A model with more parameters always gives better answers.
+Correct: More parameters can increase capacity, but quality also depends on architecture, data quality, training, evaluation, and the task. A smaller model can outperform a larger one on a particular task.
+Parameters vs. training data
+Parameters	Training data
+Learned numerical values inside the model	Examples used to train the model
+Persist in the trained model	Used during the training process
+Updated during training or fine-tuning	Can influence what patterns the model learns
+Used during inference to produce predictions	Not automatically accessible as a searchable database
+Training does not imply that every example is stored verbatim or can be reliably recalled.
+
+10. Pre-training — teaching the model general language patterns
+Simple definition
+Pre-training is the initial, large-scale training stage in which a model learns useful patterns from a broad dataset.
+Many modern decoder-only LLMs are pre-trained using next-token prediction.
+How it works
+Suppose the training text is:
+"The server returned an error because the database was ..."
+The model learns to predict the next token based on the preceding tokens. During training, its predictions are compared against the expected next token, and its parameters are adjusted.
+Repeating this process across large amounts of text teaches the model patterns involving language, code, and information present in the training data.
+The exact training objectives vary by architecture and model.
+Practical backend example
+After pre-training, a model may be able to explain REST APIs, generate SQL, or describe Redis because it has learned patterns relevant to these topics.
+That does not mean it knows your company's private production schema or today's order statuses.
+Interview answer
+Pre-training is the initial training stage in which a model learns general patterns from a large dataset. For many modern decoder-only LLMs, this involves predicting the next token and adjusting the model's parameters based on prediction errors. Pre-training creates the general-purpose model that can later be adapted through fine-tuning or used directly for inference.
+
+Common misconception
+Wrong: Pre-training gives the model access to all the data it was trained on as a searchable database.
+Correct: Pre-training changes the model's parameters. It does not create a guaranteed, exact-retrieval interface to every training example.
+
+11. Fine-tuning — adapting an existing model
+Simple definition
+Fine-tuning is additional training performed on an already pre-trained model to adapt it to a particular task, format, or behavior.
+How it works
+Suppose you have a pre-trained model that understands general language, but you want it to classify support tickets consistently.
+You collect examples such as:
+Input: "I was charged twice for my order."
+Expected output: {"category": "BILLING"}
+
+Input: "I cannot log in to my account."
+Expected output: {"category": "ACCOUNT_ACCESS"}
+
+
+Fine-tuning trains the model on task-specific examples. Depending on the method, it may update all model parameters or only a subset through techniques such as parameter-efficient fine-tuning.
+The objective is to make the model perform the target task more consistently.
+Practical backend example
+Your customer support system needs the model to return valid structured JSON with predefined categories.
+Fine-tuning may help it learn the expected output patterns, especially when you have a sufficiently good dataset of representative examples.
+However, before fine-tuning, consider whether clear prompting, schema-constrained output, or ordinary application validation already solves the problem.
+Interview answer
+Fine-tuning is additional training on a pre-trained model using task-specific examples. It adapts the model's learned behavior for a particular task, output format, or domain. It is useful when prompting alone is insufficient and we have suitable training data. It is not the same as retrieving external documents, and it does not automatically give the model access to current business data.
+
+Common misconception
+Wrong: Fine-tuning is how you add every new company document to the model.
+Correct: Fine-tuning changes model behavior through additional training. For frequently changing information or facts that need to be retrieved and cited, RAG is often more appropriate.
+RAG vs. fine-tuning
+RAG	Fine-tuning
+Retrieves external information at request time	Changes model parameters through additional training
+Useful for current or frequently updated knowledge	Useful for adapting behavior, style, and task performance
+Requires retrieval infrastructure and relevant context	Requires suitable training examples and a training process
+Updating documents can update the searchable knowledge source	New information is not learned merely by adding it to an inference prompt
+These approaches can also be combined. They solve different problems.
+
+12. Trained models — connecting fine-tuning to inference
+This topic connects the training process to the model your backend actually uses.
+Simple definition
+A trained model is the model after its parameters have been learned or updated through training. In practice, a deployable model artifact includes the architecture/configuration and the learned parameters, plus any required supporting assets.
+How it works
+Training data
+     ↓
+Pre-training
+     ↓
+Pre-trained model
+     ↓
+Optional fine-tuning
+     ↓
+Adapted model
+     ↓
+Deploy / load model
+     ↓
+Inference requests
+     ↓
+Generated responses
+
+
+Fine-tuning is optional. A pre-trained model can be used directly for inference.
+Also, the production model may undergo other post-training steps, such as instruction tuning or preference-based alignment. You only need the broad distinction for a basic backend interview.
+Practical backend example
+Suppose your company deploys a model fine-tuned to classify support tickets.
+- During training, the model's parameters are adjusted using labeled examples.
+- After training, the resulting model artifact is made available for serving.
+- At runtime, your Node.js backend sends a new ticket to the model.
+- The model predicts a category using the trained parameters.
+The backend does not normally retrain the model for every ticket.
+Interview answer
+A pre-trained model is the result of initial large-scale training. We can optionally fine-tune it using task-specific data to adapt its behavior. The resulting model is then deployed for inference, where it processes new inputs using its learned parameters to produce predictions or generated text. Training changes the model; inference uses the trained model.
+
+Common misconception
+Wrong: Fine-tuning happens whenever the model answers a question.
+Correct: Fine-tuning is a training operation. Inference is the runtime operation that generates a response.
+Pre-training vs. fine-tuning vs. inference
+Stage	Main purpose	Changes parameters?
+Pre-training	Learn general patterns	Yes
+Fine-tuning	Adapt behavior using specific examples	Usually yes, at least some parameters
+Inference	Generate a response or prediction	No, not in ordinary inference
+Ordinary inference can still use temporary computation and intermediate state, such as a key-value cache, without updating the model's learned parameters.
+
+13. Inference, temperature, and hallucination
+These concepts are related, but they are not interchangeable.
+A. Inference
+Definition: Inference is running a trained model on an input to produce a prediction or response.
+How it works:
+Input text
+    ↓
+Tokenization
+    ↓
+Trained model processes input
+    ↓
+Scores for possible next tokens
+    ↓
+Select next token
+    ↓
+Repeat until generation stops
+    ↓
+Response
+
+
+Many autoregressive LLMs generate output one token at a time. Each generated token becomes part of the context for subsequent generation.
+Backend example: Your Node.js service calls an LLM API with a prompt, receives generated text, validates the result, and returns a response to the client.
+Interview answer:
+Inference is the process of using a trained model to generate a prediction or response for new input. For an autoregressive LLM, the model repeatedly predicts the next token until it reaches a stopping condition. In a production backend, inference introduces latency, token-based cost, and potential reliability issues that the application must handle.
+
+Common misconception: Inference means training the model on the user's request. Ordinary inference does not update the learned parameters.
+B. Temperature
+Definition: Temperature is a generation setting that influences how the model selects among possible next tokens.
+A lower temperature generally makes the selection more concentrated around higher-scoring candidates. A higher temperature generally makes selection more varied.
+Imagine the model assigns these illustrative scores, expressed here as probabilities before temperature adjustment:
+Next token	Initial probability
+"approved"	70%
+"pending"	20%
+"rejected"	10%
+At a low temperature, generation will generally favor the most likely token more strongly. At a higher temperature, less likely alternatives may be selected more often.
+These percentages are illustrative. Temperature modifies the distribution of selection scores; it does not directly set a token's probability to a particular value.
+Backend example:
+- A strict data-extraction task may benefit from a low temperature.
+- Creative text generation may benefit from a higher temperature.
+A low temperature does not guarantee identical outputs across all models, configurations, or serving conditions.
+Interview answer:
+Temperature controls the randomness of token selection during LLM generation. Lower values generally make the output more predictable by concentrating selection around higher-scoring tokens, while higher values generally increase variability. It is a generation control, not a mechanism for improving factual knowledge or guaranteeing correctness.
+
+Common misconception: Setting temperature to zero eliminates hallucinations. It does not.
+C. Hallucination
+Definition: An LLM hallucination is an output that contains false, fabricated, or unsupported information presented as though it were valid.
+How it happens
+LLMs generate plausible continuations based on learned patterns and available context. They do not inherently guarantee that every generated statement corresponds to a verified fact.
+A model may:
+- Invent a company policy.
+- Cite a document that does not exist.
+- Generate a plausible but incorrect SQL column name.
+- Give an outdated answer.
+- Misinterpret retrieved information.
+Backend example
+The user asks:
+"What is our current refund window?"
+The retrieved documents do not mention refunds. The model nevertheless answers:
+"Our refund window is 60 days."
+That answer is a hallucination if the claim is unsupported or false.
+A safer design instructs the model to abstain when evidence is missing, checks whether relevant sources were retrieved, and provides citations where appropriate. These measures reduce risk but do not guarantee correctness.
+Interview answer:
+Hallucination occurs when an LLM generates false or unsupported information that sounds plausible. It happens because generation is based on learned patterns and input context rather than a guarantee of factual verification. We can reduce hallucinations using RAG, clear instructions, source citations, output validation, and abstention when evidence is insufficient, but we cannot eliminate them merely by changing a generation parameter.
+
+Common misconception: RAG completely eliminates hallucination. It can improve grounding, but incorrect retrieval or incorrect interpretation can still produce false answers.
+Temperature vs. hallucination
+Temperature	Hallucination
+A generation setting	An output-quality problem
+Influences token selection variability	Concerns factual correctness or support
+Can change how responses are generated	Can occur at low or high temperature
+Does not provide external verification	Requires grounding, validation, and appropriate system design to mitigate
+The key point: predictability is not the same as correctness. A model can confidently and consistently produce an incorrect answer.
+
+14. Connect the entire picture
+Now combine the concepts into two workflows.
+Workflow A: How an LLM generates text
+Text
+The user's prompt or input
+
+Tokens → Token IDs
+Split text and assign vocabulary identifiers
+
+Embeddings
+Convert token IDs into numerical representations
+
+Transformer + Attention
+Process token relationships and context
+
+Trained Model
+Use learned parameters from training
+
+Inference
+Predict and select the next token repeatedly
+
+Response
+Decode generated tokens into text
+
+
+A technical distinction worth remembering: token IDs are mapped to embeddings inside the model. Embeddings are not necessarily a separately generated artifact, and the embedding model used for RAG search may be a different model from the LLM that generates answers.
+Workflow B: How RAG adds external knowledge
+Company documents
+PDFs, policies, support docs, knowledge articles
+
+Extract text → Chunk → Embed
+Create searchable representations of document sections
+
+Vector database
+Store vectors, chunk text and metadata
+
+
+User query → Embed → Retrieve
+Find relevant chunks and apply authorization filters
+
+Prompt + Retrieved Context
+Instructions, evidence, question
+
+LLM → Response
+Generate an answer grounded in the supplied information
+
+
+Notice the division of responsibility:
+- Embeddings make similarity-based retrieval possible.
+- The vector database stores and retrieves the vectors and associated information.
+- RAG is the overall technique that connects retrieval to generation.
+- The LLM generates the answer.
+- The backend controls access, orchestration, validation, and failure handling.
+
+15. Quick revision sheet
+Use this for a five-minute review before an interview.
+Topic	Remember this
+Tokens	Units of text processed by the model; represented by token IDs.
+Embeddings	Numerical vectors that capture useful relationships between items.
+Vector database	Stores vectors and supports similarity search, often with metadata filtering.
+RAG	Retrieves external information and supplies it to the LLM as context.
+Transformers	Neural network architecture underlying most modern LLMs.
+Attention	Lets token representations incorporate information from relevant tokens.
+Context window	The tokenized information the model can handle within its applicable limits.
+Parameters	Learned numerical values that determine model behavior.
+Pre-training	Initial broad training that teaches general patterns.
+Fine-tuning	Additional training that adapts an existing model to a task or behavior.
+Trained model	The model after training, ready to be used for inference.
+Inference	Running the trained model to generate a prediction or response.
+Temperature	Influences variability in next-token selection.
+Hallucination	False or unsupported output presented as plausible information.
+16. Ten common interview questions with model answers
+These answers are deliberately concise. Practice explaining each without reading.
+1. What is an LLM?
+Reveal model answer
+
+2. What is the difference between tokens and embeddings?
+Reveal model answer
+
+3. Why do we need a vector database in RAG?
+Reveal model answer
+
+4. Explain the RAG pipeline.
+Reveal model answer
+
+5. What is the difference between a Transformer and attention?
+Reveal model answer
+
+6. What is a context window?
+Reveal model answer
+
+7. What are model parameters?
+Reveal model answer
+
+8. Differentiate pre-training and fine-tuning.
+Reveal model answer
+
+9. What is the difference between RAG and fine-tuning?
+Reveal model answer
+
+10. How would you reduce hallucinations in a production LLM application?
+Reveal model answer
+0 of 10 answers revealed
+Reveal all
+
+
+17. Five comparisons interviewers frequently ask
+Comparison 1: Tokens vs. embeddings
+- Tokens are discrete text units represented by IDs.
+- Embeddings are numerical vector representations.
+- Remember: An ID identifies a token; an embedding represents it numerically for computation.
+Comparison 2: Embeddings vs. vector databases
+- Embedding model: converts content into vectors.
+- Vector database: stores and searches those vectors.
+- Remember: Generating a vector and retrieving similar vectors are different operations.
+Comparison 3: RAG vs. fine-tuning
+- RAG supplies external knowledge at inference time.
+- Fine-tuning modifies model behavior through additional training.
+- Remember: RAG updates the retrievable knowledge source; fine-tuning updates learned parameters.
+Comparison 4: Context window vs. model memory
+- Context window: what is available in the current processing context.
+- Application memory: what your backend persists and can send again.
+- Model parameters: what the model learned during training.
+- Remember: A previous conversation is not automatically available just because the model has a large context window.
+Comparison 5: Temperature vs. hallucination
+- Temperature changes generation variability.
+- Hallucination concerns factual accuracy or evidential support.
+- Remember: A deterministic answer can still be wrong; reducing temperature is not a factual verification strategy.
+
+18. What you must know vs. what you can leave for later
+For backend interviews, prioritize understanding the system and its failure modes over memorizing ML terminology.
+
+Know confidently — interview essentials
+- How tokenization and token-based API billing work.
+- How embeddings enable semantic search.
+- How a vector database differs from an embedding model.
+- The complete RAG indexing and query pipelines.
+- The relationship between Transformers and attention.
+- Context limits, pre-training, fine-tuning, and inference.
+- Why hallucinations occur and how backend systems mitigate them.
+
+
+
+
+Understand at a high level — useful follow-ups
+- Query, Key, and Value in attention.
+- How similarity measures rank document chunks.
+- Why chunk size and retrieval quality affect RAG.
+- How token counts affect latency, cost, and context limits.
+- Why low temperature does not guarantee correctness.
+
+
+
+
+Safely defer — advanced study
+- Deriving the mathematical attention equations.
+- Backpropagation and gradient calculations in detail.
+- Implementing a Transformer from scratch.
+- Designing a custom tokenizer.
+- Training an LLM from scratch or tuning low-level GPU kernels.
+
+
+
+19. Apply this to a backend system design interview
+Suppose an interviewer asks you to design an internal company-document chatbot. Your explanation should connect the concepts to concrete engineering decisions.
+Interview concern	What you should discuss
+Document ingestion	Extract text, chunk it, generate embeddings, and index it
+Query handling	Authenticate the user, embed the question, and retrieve relevant chunks
+Data security	Enforce document-level authorization during retrieval
+LLM integration	Construct prompts, call the API, handle timeouts and retries appropriately
+Cost and latency	Limit retrieved context, manage token budgets, and measure usage
+Response quality	Evaluate retrieval, validate output, cite sources, and abstain when evidence is insufficient
+Document updates	Re-index changed content and remove obsolete vectors
+Reliability	Handle model failures, empty retrieval results, rate limits, and malformed outputs
+One important production distinction: the LLM should not be your authorization system or your source of truth. Your backend must enforce access controls and verify important business facts independently.
+Final takeaway
+You should be able to explain this chain without hesitation:
+Tokens represent text → embeddings represent items numerically → vector databases retrieve similar items → RAG supplies external context → Transformers use attention to process context → trained parameters determine model behavior → inference generates the response.
+Pre-training creates the initial model, fine-tuning can adapt it, and temperature influences generation variability. None of these guarantees factual correctness.

@@ -37,6 +37,20 @@ Libuv wraps them all -> you write fs.readFile() once, it works everywhere.
   OS Kernel    | Worker     | Performs the disk/network operations
 
 
+
+Libuv has a thread pool used by certain operations, including:
+- Filesystem operations
+- crypto.pbkdf2() and some other crypto operations
+- dns.lookup()
+
+
+Task	                                     Type	                                       Execution
+fs.readFile()	                        Primarily I/O-bound                           Asynchronous; filesystem work uses libuv's thread pool
+crypto.pbkdf2()                      	CPU-intensive                               	Asynchronous; computation uses libuv's thread pool
+Large JavaScript calculation	        CPU-bound                                     Main thread by default
+fs.readFileSync()                     Primarily I/O-bound, but synchronous	        Main thread blocks while reading
+
+
 ━━━━━━━━━━━━━━━ 🚀 Execution Lifecycle ━━━━━━━━━━━━━━━
 
 Run `node index.js` -> one OS process + one Main Thread (V8).

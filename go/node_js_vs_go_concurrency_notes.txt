@@ -1,0 +1,153 @@
+================================================================================
+                NODE.JS VS. GO: CONCURRENCY & EXECUTION NOTES
+================================================================================
+
+1. HOW NODE.JS HANDLES 1,000 REQUESTS (I/O-BOUND)
+--------------------------------------------------------------------------------
+When 1,000 incoming HTTP requests arrive simultaneously:
+
+  [ 1,000 Incoming HTTP Requests ]
+                 │
+                 ▼
+  [     Node.js Event Loop       ]  --> Executes JS callbacks one at a time
+                 │
+                 ▼
+  [    MySQL Connection Pool     ]  --> Example: 50 available connections
+         ├── 50 Queries          : Actively using connections
+         └── 950 Queries         : Queued (waiting for an open connection)
+
+How it works:
+The event loop does not execute all 1,000 JavaScript handlers simultaneously. 
+It starts each handler one by one. When a handler reaches an asynchronous 
+database query, Node.js offloads the network I/O to the OS kernel (via epoll, 
+kqueue, or IOCP) and immediately continues processing other callbacks while the 
+query is pending.
+
+
+2. WHAT IS THE LIBUV THREAD POOL USED FOR?
+--------------------------------------------------------------------------------
+By default, libuv allocates 4 worker threads (configurable via the 
+UV_THREADPOOL_SIZE environment variable, up to 1024).
+
+Why does it exist if the OS handles network I/O?
+Not all operations have asynchronous support at the OS kernel level. Node.js 
+uses the libuv thread pool to offload blocking operations so they don't freeze 
+the main Event Loop. These include:
+  - File System I/O (most `fs.*` methods)
+  - DNS lookups (`dns.lookup()`, which uses the blocking C library `getaddrinfo`)
+  - CPU-intensive C++ add-ons / native modules:
+      * `crypto` (e.g., `crypto.pbkdf2`, `crypto.scrypt`, `crypto.randomBytes`)
+      * `zlib` (compression/decompression)
+
+Note: Network I/O (HTTP, TCP/UDP sockets, database queries over TCP) does NOT 
+use the libuv thread pool; it relies directly on non-blocking OS kernel APIs.
+
+
+3. WHAT IF REQUESTS REQUIRE CPU-HEAVY WORK?
+--------------------------------------------------------------------------------
+This is where Node.js behaves very differently from Go's goroutine scheduling.
+
+Consider this Express route:
+
+  app.get('/compute', (req, res) => {
+    // Blocks the event loop while this computation runs
+    let result = 0;
+
+    for (let i = 0; i < 1e9; i++) {
+      result += i;
+    }
+
+    res.json({ result });
+  });
+
+While this synchronous loop runs, the main JavaScript thread cannot process any 
+other request callbacks, timers, or I/O events. Even if 1,000 requests arrive, 
+a single CPU-heavy synchronous task will completely block the event loop.
+
+Solution for Node.js:
+For CPU-intensive tasks, offload the work using `worker_threads` (which spin up 
+separate V8 instances), a separate worker process (`child_process`), or an 
+external job queue (e.g., BullMQ + Redis).
+
+
+4. ARCHITECTURE COMPARISON: NODE.JS VS. GO
+--------------------------------------------------------------------------------
+The Key Difference:
+  * Node.js : One main JavaScript thread handles all user callbacks; async I/O 
+              remains in flight concurrently via the OS, while the libuv pool 
+              handles specific internal blocking operations.
+  * Go      : Many goroutines run or wait independently, with the Go runtime 
+              multiplexing runnable goroutines across multiple OS threads.
+
+
+4.1. Node.js: Main Thread Blocked, Worker Threads Idle
+------------------------------------------------------
+Suppose a Node.js process has 1 main thread and 4 libuv worker threads:
+
+  Node.js Process
+  │
+  ├── Main Thread (Event Loop)  ❌ BLOCKED (Running CPU-heavy JavaScript)
+  │
+  ├── libuv Worker Thread 1     💤 IDLE
+  ├── libuv Worker Thread 2     💤 IDLE
+  ├── libuv Worker Thread 3     💤 IDLE
+  └── libuv Worker Thread 4     💤 IDLE
+
+Why can't the other 4 libuv threads take over?
+Because libuv's worker threads are C/C++ threads without a V8 JavaScript 
+engine instance attached to them. They are strictly reserved for specific 
+internal tasks (filesystem, crypto, DNS, zlib) and cannot execute general 
+JavaScript callbacks. To run JavaScript in parallel, you must explicitly use 
+the `worker_threads` module or run multiple Node.js processes.
+
+
+4.2. Go: Multiple Goroutines Running Across OS Threads
+------------------------------------------------------
+Go includes an M:N runtime scheduler that distributes runnable goroutines 
+across available OS threads (defaults to the number of CPU cores via GOMAXPROCS).
+
+  Go Process
+  │
+  ├── OS Thread 1  ⚙️ BUSY (Executing Goroutine A: CPU-heavy work)
+  ├── OS Thread 2  ✅ RUNNING (Executing Goroutine B)
+  ├── OS Thread 3  ✅ RUNNING (Executing Goroutine C)
+  └── OS Thread 4  ✅ RUNNING (Executing Goroutine D)
+
+If one OS thread is occupied with heavy CPU work (Goroutine A), other OS 
+threads continue executing other goroutines in parallel (provided CPU cores 
+are available). Furthermore, since Go 1.14, the Go runtime supports 
+asynchronous preemption—meaning even a tight CPU loop on OS Thread 1 can be 
+paused by the scheduler to let other goroutines share that thread.
+
+
+5. DEEP DIVE: GOROUTINES VERSUS OS THREADS
+--------------------------------------------------------------------------------
+  * OS Thread : Managed by the operating system kernel. Heavyweight (typically 
+                1 MB to 8 MB stack size, expensive context switches).
+  * Goroutine : Managed by the Go runtime in user space. Lightweight (starts 
+                with a ~2 KB dynamic stack, very fast context switches).
+
+A single Go process can effortlessly manage tens or hundreds of thousands of 
+goroutines without requiring thousands of OS threads.
+
+Example Backend Service Workload:
+  - 1,000 HTTP requests waiting for responses from downstream services
+  - 200 background jobs running
+  - 100 Kafka messages being processed
+  - Additional goroutines handling timers and coordination
+
+How Go handles this:
+These tasks do not all execute CPU instructions simultaneously. Go multiplexes 
+runnable goroutines across a small pool of OS threads. When a goroutine waits 
+for network I/O, channels, or mutex locks, the Go runtime parks that goroutine 
+(using its internal network poller) and immediately schedules another runnable 
+goroutine onto that same OS thread.
+
+Practical Advantage & Caveat:
+You can write straightforward, sequential-looking concurrent code without 
+paying the cost of an OS thread per task. 
+However, remember: goroutines are cheap, not free. They still consume memory 
+and runtime resources. If a goroutine blocks forever on a channel or I/O 
+without a timeout (a "goroutine leak"), it will retain its memory resources 
+indefinitely.
+================================================================================
