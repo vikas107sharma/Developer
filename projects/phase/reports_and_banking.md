@@ -149,3 +149,23 @@ Numbers you must know
 ⚠️ **The reconciliation figures are IDFC; the RSA+AES envelope work in this card is ICICI.** The resume
 says "bank integrations" rather than naming one, deliberately. Do not let the ₹36 Cr get attached to the
 ICICI envelope in conversation — they are different integrations.
+
+
+
+====================== Bank integerations ================================
+1. Key exchange 
+AES (Data Key): Encrypts bulk data fast with unlimited payload size.
+RSA (Master Key): Encrypts only the 32-byte AES key for secure asymmetric exchange.
+
+RSA + AES Envelope Encryption (Bank Pull Request)
+Setup: We share our RSA Public Key with the bank and keep our RSA Private Key secure on our servers.
+
+Bank's Action (Encryption):
+Generates a fresh, temporary AES key for the request.
+Encrypts the large JSON payload using this AES key.
+Encrypts the AES key itself using our RSA Public Key.
+Sends the combined payload (Encrypted JSON + Encrypted AES key) back to us.
+
+Our Action (Decryption):
+We use our RSA Private Key to decrypt the AES key.
+We use the newly decrypted AES key to decrypt the JSON payload.

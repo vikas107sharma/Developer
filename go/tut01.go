@@ -1,3 +1,5 @@
+// Basics
+
 package main
 
 import (
@@ -5,6 +7,14 @@ import (
 	"sync"
 	"time"
 )
+
+func learnSlices() {
+	// array of size 4
+	// var nums [4]int {1,2,3,4}
+
+	var nums []int
+	
+}
 
 func worker(url string, wg *sync.WaitGroup, resultChan chan string) {
 	defer wg.Done()

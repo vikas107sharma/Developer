@@ -47,7 +47,7 @@ Docker Compose — tool to manage multi-container apps.
 
 To build virtul machine you wil start with the hardware on the top of it you will need hupervisor, on the top of it you have the virtual machines such windows, linux, unix, on the top of it you have the applications.
 
-VMs consumes a lot of disk space, because each VM will have its own operating system, It also use lot of RAM and CPU power. Since it have entire Operating system it takes time to boot up It also requires licence for each operating system which requires more money.
+VMs consumes a lot of disk space, because each VM will have its own operating system, It use lot of RAM and CPU power. Since it have entire Operating system it takes time to boot up It also requires licence for each operating system which requires more money.
 
 While VMM simulates entire machines, containers only contains an application that has been bundled with files configurations and dependencies.
 
@@ -57,8 +57,9 @@ VIRTUAL MACHINES                         CONTAINERS
 +--------------------------+             +--------------------------+
 |       APPLICATION        |             | APPLICATION WINDOWS      |
 +--------------------------+             +--------------------------+
-|  VM 1   | VM 2  | VM 3   |             |                          |
-| (LINUX) |(WIN)  |(UNIX)  |             |     CONTAINER ENGINE     |
+|  VM 1   | VM 2  | VM 3   |             | container1 | container 2 |
++                          +             +--------------------------+ 
+| (LINUX) |(WIN)  |(UNIX)  |             |     CONTAINER ENGINE     | (Here instead of hypervisor you will have a container engine)
 +---------+-------+--------+             +--------------------------+
 |        HYPERVISOR        |             |     OPERATING SYSTEM (Linux)|  It can be windows also
 +--------------------------+             +--------------------------+
